@@ -1,0 +1,33 @@
+%%FILE %NAME%/%NAME%.html
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>%NAME%</title>
+    <link rel=stylesheet type=text/css href=%NAME%.css>
+  </head>
+  <body>
+    <h1>%NAME%</h1>
+    <script src=%NAME%.js></script>
+  </body>
+</html>
+%%FILE %NAME%/%NAME%.css
+body {
+  margin: 10px;
+  font: 13px "Helvetica Neue", HelveticaNeue, Helvetica, Arial, "Liberation Sans",
+               FreeSans, sans-serif;
+}
+%%FILE %NAME%/views.soy
+{namespace %NAME%Views}
+/**
+ * Says hello to the world
+ */
+{template .helloWorld}
+  Hello, world!
+{/template}
+%%FILE %NAME%/%NAME%.js
+/**
+ * @fileoverview Drives the main.html page
+ * @requires "views.soy"
+ */
+
+document.body.appendChild(soy.renderAsFragment(%NAME%Views.helloWorld))
