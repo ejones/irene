@@ -194,6 +194,11 @@ class ResourceCompiler (startTime: Long, charset: Charset,
           elem replaceWith inj
         }
 
+        // update the observable $LAST_MODIFIED
+        val stamp = doc createElement "script"
+        stamp appendChild new DataNode ("$LAST_MODIFIED = new Date(" + startTime + ")", "")
+        doc.body appendChild stamp
+
         // try to compress whitespace in output (we could remove it, but that could
         // create large lines which cause problems in proxies etc.)
         doc.outputSettings prettyPrint false
