@@ -1,0 +1,197 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <title>Irene by ejones</title>
+    <link rel="stylesheet" href="stylesheets/styles.css">
+    <link rel="stylesheet" href="stylesheets/pygment_trac.css">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js"></script>
+    <script src="javascripts/respond.js"></script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <!--[if lt IE 8]>
+    <link rel="stylesheet" href="stylesheets/ie.css">
+    <![endif]-->
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+
+  </head>
+  <body>
+
+      <div id="header">
+        <nav>
+          <li class="fork"><a href="https://github.com/ejones/irene">Fork On GitHub</a></li>
+          <li class="downloads"><a href="https://github.com/ejones/irene/zipball/master">ZIP</a></li>
+          <li class="downloads"><a href="https://github.com/ejones/irene/tarball/master">TAR</a></li>
+          <li class="title">DOWNLOADS</li>
+        </nav>
+      </div><!-- end header -->
+
+    <div class="wrapper">
+
+      <section>
+        <div id="title">
+          <h1>Irene</h1>
+          <p>A build tool that simplifies high-performance web sites.</p>
+          <hr>
+          <span class="credits left">Project maintained by <a href="https://github.com/ejones">ejones</a></span>
+          <span class="credits right">Hosted on GitHub Pages &mdash; Theme by <a href="http://twitter.com/#!/michigangraham">mattgraham</a></span>
+        </div>
+
+        <p>If you're building a "rich" web app with multiple client-side resources, and you're aiming for, say, the <a href="http://developer.yahoo.com/performance/rules.html">Best Practices for Speeding Up Your Web Site</a>, you're probably going to use one or more CSS or JavaScript minifiers, perhaps a client-side templating library, and a build script or two or perhaps a server-side "asset pipeline" to wrap it all together.</p>
+
+<p>Irene is a small tool that simplifies things by picking up resources' dependencies on other resources (say, a JavaScript file on a JavaScript utility file), calling an appropriate minifier/"compiler", and bundling it all together for (ideally) a single download for the browser. The dependencies are listed at the top of a file, so it doesn't require any build scripts or anything. It also adds project scaffolds and a development reloader.</p>
+
+<p>Source files are processed as follows:</p>
+
+<ul>
+<li>
+<strong>CSS</strong> files are processed with <a href="http://code.google.com/p/closure-stylesheets/">Google Closure Stylesheets</a>
+</li>
+<li>
+<strong>templates (.soy)</strong> are processed with <a href="https://developers.google.com/closure/templates/">Google Closure (Soy) Templates</a>
+</li>
+<li>
+<strong>JavaScript</strong> files are processed with the <a href="https://developers.google.com/closure/compiler/">Google Closure Compiler</a>
+</li>
+</ul><h2>Quick Start</h2>
+
+<p>Irene runs on the JVM. Pick up the <a href="https://github.com/downloads/ejones/irene/irene-latest.jar">latest jar</a> and run:</p>
+
+<pre><code>java -jar irene-latest.jar create hello
+</code></pre>
+
+<p>This is a shorthand for "create basic hello", i.e., create a project called "hello" with the "basic" template. You will get a project that looks like:</p>
+
+<pre><code>+-hello/
+  +-hello.css
+  +-hello.soy
+  +-hello.js
+  +-hello.html
+</code></pre>
+
+<p>Poke around if you want, and then run the following to build:</p>
+
+<pre><code>java -jar irene-latest.jar hello
+</code></pre>
+
+<p>Then check out the result by opening <code>hello/hello.min.html</code>.</p>
+
+<h2>When does it make sense?</h2>
+
+<p>Irene bundles the dependencies of an HTML page or JavaScript library together into a single download. This makes the most sense for rich web apps where a page is downloaded once and cached for several future loads. The action happens in data API calls originating from JavaScript (i.e., AJAX or Comet heavy).</p>
+
+<p>Here's a typical resource flow. This is what the first request from the browser looks like:</p>
+
+<pre><code>  |                                                         |
+B |   GET /static/main.min.html                             | S
+R | ------------------------------------------------------&gt; | E
+O | &lt;------------------------------------------------------ | R
+W |   200 OK                                                | V
+S |   ...                                                   | E
+E |   &lt;html&gt;(all resources req'd for main.html)&lt;/html&gt;      | R
+R |                                                         |
+  |                                                         |
+  |   GET /app/load_data                                    |
+  | ------------------------------------------------------&gt; |
+  | &lt;------------------------------------------------------ |
+  |   200 OK                                                |
+  |   ...                                                   |
+  |   { "data": ... }                                       |
+</code></pre>
+
+<p>And here's each subsequent request, if the user doesn't hit "refresh", etc.:</p>
+
+<pre><code>  |                                                         |
+B |   GET /static/main.min.html                             | S
+R | -----------.                                            | E
+O | &lt;----------'                                            | R
+W |   (from cache)                                          | V
+S |   ...                                                   | E
+E |   &lt;html&gt;(all resources req'd for main.html)&lt;/html&gt;      | R
+R |                                                         |
+  |                                                         |
+  |   GET /app/load_data                                    |
+  | ------------------------------------------------------&gt; |
+  | &lt;------------------------------------------------------ |
+  |   200 OK                                                |
+  |   ...                                                   |
+  |   { "data": ... }                                       |
+  |                                                         |
+</code></pre>
+
+<p>That is, for subsequent requests, the server only sees the (small) API calls.</p>
+
+<h2>How does it work?</h2>
+
+<p>Irene picks up file dependencies in two ways depending depending on the filetype. For HTML, it treats any <code>&lt;script&gt;</code> or <code>&lt;link&gt;</code> tag that points to a valid local file as a compilable dependency. For the other types (.css, .js, .soy), it looks for the <a href="http://code.google.com/p/jsdoc-toolkit/">JSDoc</a> tag "requires", when it is surrounded by quotes. Here's an example:</p>
+
+<div class="highlight">
+<pre><span class="cm">/**</span>
+<span class="cm"> * @fileoverview Drives the user profile.</span>
+<span class="cm"> * @requires "util.js"</span>
+<span class="cm"> * @requires "views.soy"</span>
+<span class="cm"> */</span>
+</pre>
+</div>
+
+
+<p>In this way, HTML may depend on .css and .js files, CSS on other .css, JavaScript on .js or .soy, and Soy on other .soy.</p>
+
+<p>When you give <code>irene-latest.jar</code> a directory as its argument (or none, indicating the current directory), it recurses on the files in that directory and subdirectories, processing files that match:</p>
+
+<ul>
+<li>*.html</li>
+<li>main.js</li>
+<li>DIR.js</li>
+</ul><p>Where DIR would be the file's parent directory.</p>
+
+<p>The outputs will appear alongside the originals with ".min." inserted before their extensions. For example, the basic scaffold we created above will look like this after compilation:</p>
+
+<pre><code>+-hello/
+  +-hello.css
+  +-hello.min.css
+  +-hello.soy
+  +-hello.min.soy
+  +-hello.js
+  +-hello.min.js
+  +-hello.html
+  +-hello.min.html
+</code></pre>
+
+<p>The intermediate ".min." files are kept around to speed up compilation (resources are only recompiled when they've been modified later than a target). It's best to add "<em>.min.</em>" to your .gitignore or .hgignore files.</p>
+
+<h3>But what about large external libraries?</h3>
+
+<p>As a compromise, any dependencies that contain ".min.", like "jquery-latest.min.js", are ignored.</p>
+
+<h2>Other goodies</h2>
+
+<h3>Last Modified</h3>
+
+<p>Irene will expose a variable called <code>$LAST_MODIFIED</code> in JavaScript, which is the modification time of the currently executing file (JavaScript or HTML page). Using this, your app server can, if you choose, instruct the browser to permanently cache any files containing JavaScript, and on the <em>first</em> API call that the JavaScript makes, it will send it the current modification time of the file that's supposed to be executing. If this timestamp is later than "$LAST_MODIFIED", the JavaScript can force a reload using <code>window.refresh(true)</code>.</p>
+
+<h3>Development Recompiler</h3>
+
+<p>Using the "develop" command, Irene will stick around after compilation and continually recompile whenever source files or dependencies change. In our example above, we would run:</p>
+
+<pre><code>java -jar irene-latest.jar develop hello
+</code></pre>
+
+<h2>How does it compare to XXX?</h2>
+
+<p>There are tools like <a href="http://plovr.org/">plovr</a> and <a href="http://code.google.com/p/wro4j/">Web Resource Optimizer for Java</a> that do similar things in grouping files and minification steps. Irene is, I think, unique in bundling the <a href="https://developers.google.com/closure/">Closure Tools</a>, not requiring a separate build script/manifest, and bundling the result right into the final HTML.</p>
+
+<h2>Contributing</h2>
+
+<p>After cloning the <a href="https://github.com/ejones/irene">Git repository</a>, you will need to use <a href="https://github.com/harrah/xsbt/wiki">sbt</a> to work on the project.</p>
+
+<hr><p>Copyright (C) 2012 by Evan Jones. Licensed under the MIT License - see LICENSE.txt for details.</p>
+      </section>
+
+    </div>
+    <!--[if !IE]><script>fixScale(document);</script><!--<![endif]-->
+    
+  </body>
+</html>
