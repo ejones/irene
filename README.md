@@ -1,16 +1,11 @@
 Irene Build Tool
 ================
 
-Irene simplifies the development of high-performance web apps. It provides project scaffolds, compilation, bundling, and development reloading. It covers HTML, CSS, JavaScript and templating. It embodies common [Best Practices](http://developer.yahoo.com/performance/rules.html) for fast sites, and more.
+If you're building a "rich" web app with multiple client-side resources, and you're aiming for, say, the [Best Practices for Speeding Up Your Web Site](http://developer.yahoo.com/performance/rules.html), you're probably going to use one or more CSS or JavaScript minifiers, perhaps a client-side templating library, and a build script or two or perhaps a server-side "asset pipeline" to wrap it all together.
 
-Here's the rundown:
+Irene is a small tool that simplifies things by picking up resources' dependencies on other resources (say, a JavaScript file on a JavaScript utility file), calling an appropriate minifier/"compiler", and bundling it all together for (ideally) a single download for the browser. The dependencies are listed at the top of a file, so it doesn't require any build scripts or anything. It also adds project scaffolds and a development reloader.
 
-* **dependencies for a file are declared inside it**: there are no build files, manifests or scripts involved
-* **dependencies are bundled together** resulting in a single, cacheable download for the browser
-* **templates are compiled to JavaScript** which is in turn minified and can be bundled
-* **no JavaScript frameworks are required**, only a small set of utilites for templating, if templates are used
-
-It incorporates the following tools to do this:
+Source files are processed as follows:
 
 * **CSS** files are processed with [Google Closure Stylesheets](http://code.google.com/p/closure-stylesheets/)
 * **templates (.soy)** are processed with [Google Closure (Soy) Templates](https://developers.google.com/closure/templates/)
@@ -128,7 +123,7 @@ As a compromise, any dependencies that contain ".min.", like "jquery-latest.min.
 
 ### Last Modified
 
-Irene will expose a variable called "$LAST_MODIFIED" in JavaScript, which is the modification time of the currently executing file (JavaScript or HTML page). Using this, your app server can, if you choose, instruct the browser to permanently cache any files containing JavaScript, and on the *first* API call that the JavaScript makes, it will send it the current modification time of the file that's supposed to be executing. If this timestamp is later than "$LAST_MODIFIED", the JavaScript can force a reload using `window.refresh(true)`.
+Irene will expose a variable called `$LAST_MODIFIED` in JavaScript, which is the modification time of the currently executing file (JavaScript or HTML page). Using this, your app server can, if you choose, instruct the browser to permanently cache any files containing JavaScript, and on the *first* API call that the JavaScript makes, it will send it the current modification time of the file that's supposed to be executing. If this timestamp is later than "$LAST_MODIFIED", the JavaScript can force a reload using `window.refresh(true)`.
 
 ### Development Recompiler
 
@@ -136,6 +131,10 @@ Using the "develop" command, Irene will stick around after compilation and conti
 
     java -jar irene-latest.jar develop hello
 
+
+## How does it compare to XXX?
+
+There are tools like [plovr](http://plovr.org/) and [Web Resource Optimizer for Java](http://code.google.com/p/wro4j/) that do similar things in grouping files and minification steps. Irene is, I think, unique in bundling the [Closure Tools](https://developers.google.com/closure/), not requiring a separate build script/manifest, and bundling the result right into the final HTML.
 
 ## Contributing
 
