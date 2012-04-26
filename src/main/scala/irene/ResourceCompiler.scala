@@ -53,11 +53,11 @@ object ResourceCompiler {
              visitedFiles: collection.mutable.Set[File] =
                            collection.mutable.Set[File]()) = {
 
-    def compile (file: File) {
-      val startTime = System.currentTimeMillis
-      val rc = new ResourceCompiler (startTime, charset, visitedFiles)
-      val (out, modified) = rc.fileExtToProcessor(file.extension)(file)
-      out setLastModified startTime
+    def compile (file: File) = {
+      (new ResourceCompiler (math.round(System.currentTimeMillis / 1000.0) * 1000L,
+                            charset, visitedFiles)
+        .fileExtToProcessor(file.extension)(file))
+      ()
     }
 
     def visitDir (dir: File) {
@@ -134,6 +134,7 @@ class ResourceCompiler (startTime: Long, charset: Charset,
       if (modified > target.lastModified) {
         logProcess (file, processName)
         compile (deps, target)
+        target setLastModified startTime
       }
       (target, modified)
     }
@@ -223,6 +224,7 @@ class ResourceCompiler (startTime: Long, charset: Charset,
         }
 
         Files write (doc html, target, charset)
+        target setLastModified startTime
       }
       (target, modified)
     },
