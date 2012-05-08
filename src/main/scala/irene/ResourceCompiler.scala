@@ -230,10 +230,7 @@ class ResourceCompiler (startTime: Long, charset: Charset,
     },
 
     ".js" -> JsDocProcessor(".js", "the Closure Compiler") { (files, target) =>
-      val srcFiles = new ArrayList[JSSourceFile] {{
-        add (JSSourceFile fromCode ("//lastModified.js", 
-          "var $LAST_MODIFIED = new Date("+ startTime +")"))
-      }}
+      val srcFiles = new ArrayList[JSSourceFile]()
       var hasSoy = false
       for (f <- files) {
         srcFiles add (JSSourceFile fromFile f)
@@ -244,6 +241,12 @@ class ResourceCompiler (startTime: Long, charset: Charset,
                             "//soyutils.js",
                             classOf[SoyFileSet] getResourceAsStream "soyutils.js"))
       }
+
+      var externs = jscomp.CommandLineRunner.getDefaultExterns.clone
+
+      // ensure Closure Compiler doesn't rename $LAST_MODIFIED
+      externs add (JSSourceFile fromCode ("//lastModified.extern.js", "var $LAST_MODIFIED"))
+      
 
       val opts = new jscomp.CompilerOptions;
       jscomp.CompilationLevel.ADVANCED_OPTIMIZATIONS setOptionsForCompilationLevel opts
@@ -259,8 +262,7 @@ class ResourceCompiler (startTime: Long, charset: Charset,
       jscomp.Compiler setLoggingLevel Level.WARNING
 
       val compiler = new jscomp.Compiler;
-      val res = compiler compile (
-        jscomp.CommandLineRunner getDefaultExterns, srcFiles, opts)
+      val res = compiler compile (externs, srcFiles, opts)
 
       // mimics the behaviour of the command-line Closure Compiler, also falls in line
       // with the other tools that exit the process on failure
@@ -268,7 +270,8 @@ class ResourceCompiler (startTime: Long, charset: Charset,
         System exit res.errors.length
       }
 
-      Files write (compiler toSource, target, charset)
+      Files write ("var $LAST_MODIFIED = new Date(" + startTime + ");\n", target, charset)
+      Files append (compiler toSource, target, charset)
     },
 
     ".soy" -> new JsDocProcessor {
