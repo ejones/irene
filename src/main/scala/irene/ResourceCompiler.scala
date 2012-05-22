@@ -297,7 +297,9 @@ class ResourceCompiler (startTime: Long, charset: Charset,
 
     ".css" -> JsDocProcessor(".css", "Closure Stylesheets") { (files, target) =>
       css.compiler.commandline.ClosureCommandLineCompiler.main(
-        Array ("--allow-unrecognized-properties", "--output-file", target getPath)
+        Array ("--allow-unrecognized-properties",
+               "--allow-unrecognized-functions",
+               "--output-file", target getPath)
           ++ files.map(_ getPath))
     }
   )
