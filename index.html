@@ -169,7 +169,7 @@ R |                                                         |
 
 <h3>Last Modified</h3>
 
-<p>Irene will expose a variable called <code>$LAST_MODIFIED</code> in JavaScript, which is the modification time of the currently executing file (JavaScript or HTML page). Using this, your app server can, if you choose, instruct the browser to permanently cache any files containing JavaScript, and on the <em>first</em> API call that the JavaScript makes, it will send it the current modification time of the file that's supposed to be executing. If this timestamp is later than "$LAST_MODIFIED", the JavaScript can force a reload using <code>window.refresh(true)</code>.</p>
+<p>Irene will expose a variable called <code>$LAST_MODIFIED</code> in JavaScript, which is the modification time of the currently executing file (JavaScript or HTML page).</p>
 
 <h3>Development Recompiler</h3>
 
