@@ -123,7 +123,7 @@ As a compromise, any dependencies that contain ".min.", like "jquery-latest.min.
 
 ### Last Modified
 
-Irene will expose a variable called `$LAST_MODIFIED` in JavaScript, which is the modification time of the currently executing file (JavaScript or HTML page). Using this, your app server can, if you choose, instruct the browser to permanently cache any files containing JavaScript, and on the *first* API call that the JavaScript makes, it will send it the current modification time of the file that's supposed to be executing. If this timestamp is later than "$LAST_MODIFIED", the JavaScript can force a reload using `window.refresh(true)`.
+Irene will expose a variable called `$LAST_MODIFIED` in JavaScript, which is the modification time of the currently executing file (JavaScript or HTML page).
 
 ### Development Recompiler
 
