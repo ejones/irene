@@ -14,9 +14,9 @@ Source files are processed as follows:
 
 ## Quick Start
 
-Irene runs on the JVM. Pick up the [latest jar](https://github.com/downloads/ejones/irene/irene-latest.jar) and run:
+Irene runs on the JVM. Pick up the [latest zip](https://github.com/downloads/ejones/irene/irene-latest.zip), extract `irene.jar` and run::
 
-    java -jar irene-latest.jar create hello
+    java -jar irene.jar create hello
 
 This is a shorthand for "create basic hello", i.e., create a project called "hello" with the "basic" template. You will get a project that looks like:
 
@@ -28,7 +28,7 @@ This is a shorthand for "create basic hello", i.e., create a project called "hel
 
 Poke around if you want, and then run the following to build:
 
-    java -jar irene-latest.jar hello
+    java -jar irene.jar hello
 
 Then check out the result by opening ``hello/hello.min.html``.
 
@@ -79,7 +79,7 @@ That is, for subsequent requests, the server only sees the (small) API calls.
 
 ## How does it work?
 
-Irene picks up file dependencies in two ways depending depending on the filetype. For HTML, it treats any `<script>` or `<link>` tag that points to a valid local file as a compilable dependency. For the other types (.css, .js, .soy), it looks for the [JSDoc](http://code.google.com/p/jsdoc-toolkit/) tag "requires", when it is surrounded by quotes. Here's an example:
+Irene picks up file dependencies in two ways depending depending on the filetype. For HTML, it treats any `<script>` or `<link>` tag that points to a valid local file as a compilable dependency as well as any inline `<style>` or `<script>` tag. For the other types (.css, .js, .soy), it looks for the [JSDoc](http://code.google.com/p/jsdoc-toolkit/) tag "requires", when it is surrounded by quotes. Here's an example:
 
 ```js
 /**
@@ -89,7 +89,7 @@ Irene picks up file dependencies in two ways depending depending on the filetype
  */
 ```
 
-In this way, HTML may depend on .css and .js files, CSS on other .css, JavaScript on .js or .soy, and Soy on other .soy.
+In this way, HTML may depend on .css and .js files, CSS on other .css, JavaScript on .js or .soy, and Soy on other .soy. In the case of HTML, the compiled output of all CSS dependencies and inline styles is placed just at the end of the `<head>` tag, and the compiled output of all JavaScript dependencies and inline scripts is placed at the end of the body.
 
 When you give `irene-latest.jar` a directory as its argument (or none, indicating the current directory), it recurses on the files in that directory and subdirectories, processing files that match:
 

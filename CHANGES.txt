@@ -1,0 +1,8 @@
+2012-07-28
+----------
+- JavaScript code is now wrapped in closures on output.
+- in HTML files, instead of compiling each CSS and JavaScript resource
+  separately and injecting it where the link or script tag was in the page, all
+  such dependencies are combined into a single compiled unit, and inline scripts
+  or styles are included now as well. The CSS generated in this way is injected
+  at the end of the head; JavaScript is injected at the end of the body.

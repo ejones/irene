@@ -1,0 +1,56 @@
+%%FILE %NAME%/%NAME%.html
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>%NAME%</title>
+        <link rel=stylesheet type=text/css href=B.css>
+        <link rel=stylesheet href=C.css>
+        <style>
+            body {
+                background-color: red;
+            }
+        </style>
+    </head>
+    <body>
+        <h1>%NAME%</h1>
+        <script src=B.js></script>
+        <script src=C.js></script>
+        <script>
+            alert([aModule.num, bModule.num, cModule.num, $LAST_MODIFIED])
+        </script>
+    </body>
+</html>
+%%FILE %NAME%/A.css
+body {
+    margin: 5px;
+}
+%%FILE %NAME%/B.css
+/** @requires "A.css" */
+body {
+    font-family: Helvetica;
+}
+%%FILE %NAME%/C.css
+/** @requires "A.css" */
+body {
+    font-weight: bold;
+}
+%%FILE %NAME%/A.js
+var aModule = {num: 0}
+%%FILE %NAME%/B.js
+/** @requires "A.js" */
+var bModule = {num: aModule.num + 1}
+%%FILE %NAME%/C.js
+/**
+ * @requires "A.js"
+ * @requires "views.soy"
+ */
+var cModule = {num: aModule.num + 2}
+document.body.appendChild(soy.renderAsFragment(%NAME%Views.helloWorld))
+%%FILE %NAME%/views.soy
+{namespace %NAME%Views}
+/**
+ * Says hello to the world
+ */
+{template .helloWorld}
+  Hello, world!
+{/template}

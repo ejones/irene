@@ -26,7 +26,7 @@ object ResourceCompiler {
       if (idx == -1) (path, "")
       else (path substring (0, idx), path substring (idx, path length))
     }
-    lazy val isMin = getName contains ".min."
+    lazy val isGen = getName.contains(".min.") || getName.contains("__deps__")
     def getSibling (pathname: String): File = new java.io.File (getParentFile, pathname)
   }
   object File {
@@ -65,7 +65,7 @@ object ResourceCompiler {
       for (file <- dir.listFiles map (File fromJavaFile _)) {
         if (file isFile) {
           val name = file.getName
-          if (!file.isMin && (file.extension == ".html"
+          if (!file.isGen && (file.extension == ".html"
                               || name == "main.js"
                               || name == targetableJs)) {
             compile (file)
@@ -164,41 +164,60 @@ class ResourceCompiler (startTime: Long, charset: Charset,
       val doc = Jsoup parse (file, charset name)
 
       // get all the link and script tags that point to valid file locations
-      // (i.e., relative paths), producing a list of tuples of the Node in question,
-      // its corresponding generated resource file, and the latest dep modification
-      val depsNodes = 
-        (for ((stor, atname) <- Array (
-                  ("link[rel=stylesheet][type=text/css][href]", "href"),
-                  ("script[src]", "src"));
-               elem <- doc.select(stor);
-               (out, modified) <- {
-                  val dep = file getSibling (elem attr atname)
-                  if (!dep.isMin && dep.exists) {
-                    Some (fileExtToProcessor(dep.extension)(dep))
-                  }
-                  else None
-                }) yield (elem, out, modified))
+      // (i.e., relative paths), and inline scripts and styles, and aggregate
+      // and compile them with the appropriate compilers
+      val deps = for ((stor, atname, ext, injParent, injName) <- Array (
+              ("link[rel=stylesheet][href], style", "href", ".css",
+                  doc head, "style"),
+              ("script", "src", ".js", doc body, "script"))) yield {
 
-      val modified =
-        depsNodes.foldLeft(file lastModified) { (acc, next) => math.max (acc, next._3) }
+        var aggFile = new File (file.getPath + ".__deps__" + ext)
+
+        // we (re)generate an aggregate file as necessary. For references to
+        // other files, we generate a line in the aggregate file 
+        if (file.lastModified > aggFile.lastModified) {
+          Files write (
+            doc select stor map { elem =>
+              if (elem hasAttr atname) {
+                val dep = file getSibling (elem attr atname)
+                if (!dep.isGen && dep.exists) {
+                  "/** @requires \"" + (
+                    elem attr atname replace ("\\", "\\\\")) + "\" */\n"
+                } else {
+                  ""
+                }
+              } else {
+                elem.data
+              }
+            } mkString,
+            aggFile, charset)
+        }
+
+        val (out, modified) = fileExtToProcessor(ext)(aggFile)
+        (stor, injParent, injName, out, modified)
+      }
+
+      val modified = deps.foldLeft(file lastModified) {
+                        (acc, next) => math.max (acc, next._5) }
       val target = defaultTarget (file)
 
       if (modified > target.lastModified) {
         logProcess (file, "Jsoup")
 
-        for ((elem, out, _) <- depsNodes) {
+        for ((stor, injParent, injName, out, _) <- deps) {
           // inject the output into the document
-          val inj = doc createElement (if (elem.tagName == "link") "style" else "script")
+          doc select stor foreach (_ remove)
+          val inj = doc createElement injName
           for (s <- List ("\n", Files toString (out, charset), "\n")) {
             inj appendChild new DataNode (s, "")
           }
-          elem replaceWith inj
+          injParent appendChild inj
         }
 
         // update the observable $LAST_MODIFIED
         val stamp = doc createElement "script"
         stamp appendChild new DataNode ("$LAST_MODIFIED = new Date(" + startTime + ")", "")
-        doc.body appendChild stamp
+        doc.body.children.last before stamp
 
         // try to compress whitespace in output (we could remove it, but that could
         // create large lines which cause problems in proxies etc.)
@@ -259,6 +278,11 @@ class ResourceCompiler (startTime: Long, charset: Charset,
       opts setWarningLevel (jscomp.DiagnosticGroups.NON_STANDARD_JSDOC,
                             jscomp.CheckLevel.OFF)
 
+      // soy's stdlib violates ES5 strict
+      if (!hasSoy) {
+        opts setLanguageIn jscomp.CompilerOptions.LanguageMode.ECMASCRIPT5_STRICT
+      }
+
       jscomp.Compiler setLoggingLevel Level.WARNING
 
       val compiler = new jscomp.Compiler;
@@ -269,9 +293,21 @@ class ResourceCompiler (startTime: Long, charset: Charset,
       if (res.errors.length > 0) {
         System exit res.errors.length
       }
-
-      Files write ("var $LAST_MODIFIED = new Date(" + startTime + ");\n", target, charset)
-      Files append (compiler toSource, target, charset)
+    
+      // add the last modified stamp and wrap everything in a closure
+      val ow = Files newWriter (target, charset)
+      ow write "(function(){"
+      if (!hasSoy) {
+        ow write "\"use strict\";"
+      }
+      ow write "var $LAST_MODIFIED=window.$LAST_MODIFIED||new Date(";
+      ow write startTime.toString
+      ow write ");"
+      ow newLine;
+      ow write compiler.toSource
+      ow newLine;
+      ow write "})()"
+      ow close;
     },
 
     ".soy" -> new JsDocProcessor {
