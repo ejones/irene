@@ -166,10 +166,10 @@ class ResourceCompiler (startTime: Long, charset: Charset,
       // get all the link and script tags that point to valid file locations
       // (i.e., relative paths), and inline scripts and styles, and aggregate
       // and compile them with the appropriate compilers
-      val deps = for ((stor, atname, ext, injParent, injName) <- Array (
+      val deps = for ((stor, atname, ext, injParent, injName, sep) <- Array (
               ("link[rel=stylesheet][href], style", "href", ".css",
-                  doc head, "style"),
-              ("script", "src", ".js", doc body, "script"))) yield {
+                  doc head, "style", "\n"),
+              ("script", "src", ".js", doc body, "script", ";"))) yield {
 
         var aggFile = new File (file.getPath + ".__deps__" + ext)
 
@@ -187,7 +187,7 @@ class ResourceCompiler (startTime: Long, charset: Charset,
                   ""
                 }
               } else {
-                elem.data
+                elem.data + sep
               }
             } mkString,
             aggFile, charset)
