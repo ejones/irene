@@ -22,7 +22,7 @@
       <div id="header">
         <nav>
           <li class="fork"><a href="https://github.com/ejones/irene">Fork On GitHub</a></li>
-          <li class="downloads"><a href="https://github.com/downloads/ejones/irene/irene-latest.jar">irene-latest.jar</a></li>
+          <li class="downloads"><a href="https://github.com/downloads/ejones/irene/irene-latest.zip">irene-latest.zip</a></li>
           <li class="title">DOWNLOAD:</li>
         </nav>
       </div><!-- end header -->
@@ -56,9 +56,9 @@
 </li>
 </ul><h2>Quick Start</h2>
 
-<p>Irene runs on the JVM. Pick up the <a href="https://github.com/downloads/ejones/irene/irene-latest.jar">latest jar</a> and run:</p>
+<p>Irene runs on the JVM. Pick up the <a href="https://github.com/downloads/ejones/irene/irene-latest.zip">latest zip</a>, extract irene.jar, and run:</p>
 
-<pre><code>java -jar irene-latest.jar create hello
+<pre><code>java -jar irene.jar create hello
 </code></pre>
 
 <p>This is a shorthand for "create basic hello", i.e., create a project called "hello" with the "basic" template. You will get a project that looks like:</p>
@@ -72,7 +72,7 @@
 
 <p>Poke around if you want, and then run the following to build:</p>
 
-<pre><code>java -jar irene-latest.jar hello
+<pre><code>java -jar irene.jar hello
 </code></pre>
 
 <p>Then check out the result by opening <code>hello/hello.min.html</code>.</p>
@@ -124,7 +124,7 @@ R |                                                         |
 
 <h2>How does it work?</h2>
 
-<p>Irene picks up file dependencies in two ways depending depending on the filetype. For HTML, it treats any <code>&lt;script&gt;</code> or <code>&lt;link&gt;</code> tag that points to a valid local file as a compilable dependency. For the other types (.css, .js, .soy), it looks for the <a href="http://code.google.com/p/jsdoc-toolkit/">JSDoc</a> tag "requires", when it is surrounded by quotes. Here's an example:</p>
+<p>Irene picks up file dependencies in two ways depending depending on the filetype. For HTML, it treats any <code>&lt;script&gt;</code> or <code>&lt;link&gt;</code> tag that points to a valid local file as a compilable dependency as well as any inline <code>&lt;style&gt;</code> or <code>&lt;script&gt;</code> tag. For the other types (.css, .js, .soy), it looks for the <a href="http://code.google.com/p/jsdoc-toolkit/">JSDoc</a> tag "requires", when it is surrounded by quotes. Here's an example:</p>
 
 <div class="highlight">
 <pre><span class="cm">/**</span>
@@ -136,9 +136,9 @@ R |                                                         |
 </div>
 
 
-<p>In this way, HTML may depend on .css and .js files, CSS on other .css, JavaScript on .js or .soy, and Soy on other .soy.</p>
+<p>In this way, HTML may depend on .css and .js files, CSS on other .css, JavaScript on .js or .soy, and Soy on other .soy. In the case of HTML, the compiled output of all CSS dependencies and inline styles is placed just at the end of the <code>&gt;head&lt;</code> tag, and the compiled output of all JavaScript dependencies and inline scripts is placed at the end of the body.</p>
 
-<p>When you give <code>irene-latest.jar</code> a directory as its argument (or none, indicating the current directory), it recurses on the files in that directory and subdirectories, processing files that match:</p>
+<p>When you give <code>irene.jar</code> a directory as its argument (or none, indicating the current directory), it recurses on the files in that directory and subdirectories, processing files that match:</p>
 
 <ul>
 <li>*.html</li>
@@ -175,7 +175,7 @@ R |                                                         |
 
 <p>Using the "develop" command, Irene will stick around after compilation and continually recompile whenever source files or dependencies change. In our example above, we would run:</p>
 
-<pre><code>java -jar irene-latest.jar develop hello
+<pre><code>java -jar irene.jar develop hello
 </code></pre>
 
 <h2>How does it compare to XXX?</h2>
