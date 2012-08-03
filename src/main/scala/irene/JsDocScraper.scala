@@ -21,7 +21,8 @@ object JsDocScraper extends JsDocParsers {
     "requires" -> ('"' ~> rep (chrExcept ('"')) <~ '"' ^^ (s=> DepTag (s mkString))
                    | success (UnknownTag ("requires"))))
 
-  def comment = "/*" ~> rep (chrExcept ('*') | '*' <~ not ('/')) ~> "*/"
+  def comment = ("/*" ~> rep (chrExcept ('*') | '*' <~ not ('/')) ~> "*/"
+                 | "//" ~> rep (chrExcept ('\r', '\n', '\u2028', '\u2029')))
 
   def stringLit (quote: Char) =
     quote ~> rep (chrExcept (quote, '\\') | '\\' ~> anyChr) <~ quote
