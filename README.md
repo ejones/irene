@@ -91,7 +91,7 @@ Irene picks up file dependencies in two ways depending depending on the filetype
 
 In this way, HTML may depend on .css and .js files, CSS on other .css, JavaScript on .js or .soy, and Soy on other .soy. In the case of HTML, the compiled output of all CSS dependencies and inline styles is placed just at the end of the `<head>` tag, and the compiled output of all JavaScript dependencies and inline scripts is placed at the end of the body.
 
-When you give `irene-latest.jar` a directory as its argument (or none, indicating the current directory), it recurses on the files in that directory and subdirectories, processing files that match:
+When you give `irene.jar` a directory as its argument (or none, indicating the current directory), it recurses on the files in that directory and subdirectories, processing files that match:
 
 * *.html
 * main.js
@@ -129,7 +129,7 @@ Irene will expose a variable called `$LAST_MODIFIED` in JavaScript, which is the
 
 Using the "develop" command, Irene will stick around after compilation and continually recompile whenever source files or dependencies change. In our example above, we would run:
 
-    java -jar irene-latest.jar develop hello
+    java -jar irene.jar develop hello
 
 
 ## How does it compare to XXX?
