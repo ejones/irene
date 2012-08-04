@@ -31,11 +31,11 @@ object JsDocScraper extends JsDocParsers {
    * Parses a whole JavaScript program for just the blocks of tags it contains
    */
   def program : Parser[List[List[JsDocTag]]] = rep (
-    (chrExcept ('/', '\'', '"')
+    (rep1 (chrExcept ('/', '\'', '"'))
      | stringLit ('\'')
      | stringLit ('"')) ^^^ None
     | tagBlock ^^ (Some (_))
-    | comment ^^^ None
+    | (comment | '/') ^^^ None
   ) ^^ (_ flatten)
 
   def mkResult[T] (pr: ParseResult[T]) = pr match {
