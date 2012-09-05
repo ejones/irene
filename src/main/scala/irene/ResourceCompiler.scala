@@ -130,8 +130,6 @@ class ResourceCompiler (startTime: Long, charset: Charset,
         modified
       }
 
-      println (deps mkString)
-
       val target = makeTarget (file)
       val modified = visit (file)
       if (modified > target.lastModified) {
