@@ -27,6 +27,7 @@ object ResourceCompiler {
       else (path substring (0, idx), path substring (idx, path length))
     }
     lazy val isGen = getName.contains(".min.") || getName.contains("__deps__")
+    lazy val isSource = !isGen && exists
     def getSibling (pathname: String): File = new java.io.File (getParentFile, pathname)
   }
   object File {
@@ -129,6 +130,8 @@ class ResourceCompiler (startTime: Long, charset: Charset,
         modified
       }
 
+      println (deps mkString)
+
       val target = makeTarget (file)
       val modified = visit (file)
       if (modified > target.lastModified) {
@@ -163,6 +166,13 @@ class ResourceCompiler (startTime: Long, charset: Charset,
 
       val doc = Jsoup parse (file, charset name)
 
+      def getCompilableNodes(selector: String, atname: String) =
+        doc select selector filter { elem =>
+          !elem.hasAttr(atname) || 
+                file.getSibling(elem attr atname).isSource
+        }
+        
+
       // get all the link and script tags that point to valid file locations
       // (i.e., relative paths), and inline scripts and styles, and aggregate
       // and compile them with the appropriate compilers
@@ -177,15 +187,10 @@ class ResourceCompiler (startTime: Long, charset: Charset,
         // other files, we generate a line in the aggregate file 
         if (file.lastModified > aggFile.lastModified) {
           Files write (
-            doc select stor map { elem =>
+            getCompilableNodes(stor, atname) map { elem =>
               if (elem hasAttr atname) {
-                val dep = file getSibling (elem attr atname)
-                if (!dep.isGen && dep.exists) {
-                  "/** @requires \"" + (
-                    elem attr atname replace ("\\", "\\\\")) + "\" */\n"
-                } else {
-                  ""
-                }
+                "/** @requires \"" + (
+                  elem attr atname replace ("\\", "\\\\")) + "\" */\n"
               } else {
                 elem.data + sep
               }
@@ -194,19 +199,19 @@ class ResourceCompiler (startTime: Long, charset: Charset,
         }
 
         val (out, modified) = fileExtToProcessor(ext)(aggFile)
-        (stor, injParent, injName, out, modified)
+        (stor, atname, injParent, injName, out, modified)
       }
 
       val modified = deps.foldLeft(file lastModified) {
-                        (acc, next) => math.max (acc, next._5) }
+                        (acc, next) => math.max (acc, next._6) }
       val target = defaultTarget (file)
 
       if (modified > target.lastModified) {
         logProcess (file, "Jsoup")
 
-        for ((stor, injParent, injName, out, _) <- deps) {
+        for ((stor, atname, injParent, injName, out, _) <- deps) {
           // inject the output into the document
-          doc select stor foreach (_ remove)
+          getCompilableNodes(stor, atname) foreach (_ remove)
           val inj = doc createElement injName
           for (s <- List ("\n", Files toString (out, charset), "\n")) {
             inj appendChild new DataNode (s, "")
