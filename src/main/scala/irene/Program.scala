@@ -16,7 +16,7 @@ object Program {
   lazy val defaultCharset = Charset forName "UTF-8"
   lazy val logger = Logger getLogger classOf[Program].getName
 
-  def main (args: Array[String]) = {
+  def main (args: Array[String]): Unit = {
 
     def pathArgAtIndex (idx: Int) = if (args.length > idx) args(idx) else "."
 
@@ -60,8 +60,12 @@ object Program {
         while (true) {
           val startTime = System.currentTimeMillis
           val visitedFiles = collection.mutable.Set[ResourceCompiler.File]()
-          ResourceCompiler (pathArgAtIndex(1), defaultCharset, visitedFiles)
 
+          val errs = ResourceCompiler (pathArgAtIndex(1), defaultCharset, visitedFiles)
+
+          if (errs.length > 0) {
+            logger severe (errs.length + " error(s) found! See console for details")
+          }
           logger info ("Waiting for changes...")
           @tailrec def monitor: Unit = {
             Thread sleep 2000

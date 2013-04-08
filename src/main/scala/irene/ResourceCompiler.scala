@@ -16,6 +16,13 @@ import org.jsoup.Jsoup
 import org.jsoup.nodes.{Element, DataNode, Document, Node, TextNode, Comment}
 import org.jsoup.select.NodeVisitor
 
+/**
+ * Returned by compilations of different types
+ */
+trait ResourceError {
+  
+}
+
 object ResourceCompiler {
 
   /** Adds functionality to java.io.File helpful for the compiler */
@@ -52,27 +59,30 @@ object ResourceCompiler {
    */
   def apply (filepath: String, charset: Charset,
              visitedFiles: collection.mutable.Set[File] =
-                           collection.mutable.Set[File]()) = {
+                           collection.mutable.Set[File]()): Seq[ResourceError] = {
 
-    def compile (file: File) = {
+    def compile (file: File): Seq[ResourceError] = {
       (new ResourceCompiler (math.round(System.currentTimeMillis / 1000.0) * 1000L,
                             charset, visitedFiles)
-        .fileExtToProcessor(file.extension)(file))
-      ()
+        .fileExtToProcessor(file.extension)(file))._3
     }
 
-    def visitDir (dir: File) {
+    def visitDir (dir: File): Seq[ResourceError] = {
       val targetableJs = dir.getName + ".js"
-      for (file <- dir.listFiles map (File fromJavaFile _)) {
+      dir.listFiles map (File fromJavaFile _) flatMap { file =>
         if (file isFile) {
           val name = file.getName
           if (!file.isGen && (file.extension == ".html"
                               || name == "main.js"
                               || name == targetableJs)) {
             compile (file)
+          } else {
+            Array[ResourceError]()
           }
         } else if (file isDirectory) {
           visitDir (file)
+        } else {
+          Array[ResourceError]()
         }
       }
     }
@@ -82,6 +92,8 @@ object ResourceCompiler {
       compile (file)
     } else if (file isDirectory) {
       visitDir (file getCanonicalFile)
+    } else {
+      Array[ResourceError]()
     }
 
   }
@@ -105,39 +117,49 @@ class ResourceCompiler (startTime: Long, charset: Charset,
    * Base class for generating resource processors that use JSDoc style annotations
    * for declaring dependencies (and have tools that compile multiple files as a unit)
    */
-  abstract class JsDocProcessor extends (File => (File, Long)) {
+  abstract class JsDocProcessor extends (File => (File, Long, Seq[ResourceError])) {
     def fileExt: String 
     def processName: String
-    def compile (deps: Iterable[File], target: File): Unit
+    def compile (deps: Iterable[File], target: File): Seq[ResourceError]
     def makeTarget (in: File) = defaultTarget (in)
 
     def apply (file: File) = {
       val deps = LinkedHashSet[File]()
+      var errors = ArrayBuffer[ResourceError]()
 
       def visit (file: File): Long = {
-        val (dep, modified) = 
+        val (dep, modified, errs) = 
           if (file.extension != fileExt) fileExtToProcessor(file.extension)(file)
           else {
             logVisit (file)
             visitedFiles += file
-            (file, (JsDocScraper (file, charset) flatMap (_ flatMap (_ match {
+            (file,
+                (JsDocScraper (file, charset) flatMap (_ flatMap (_ match {
                       case DepTag (path) if !path.contains(".min.") =>
                         Some (visit (file getSibling path))
                       case _ => None
-                    }))).foldLeft(file lastModified)(math.max _))
+                    }))).foldLeft(file lastModified)(math.max _),
+                Array[ResourceError](): Seq[ResourceError])
           }
         deps += dep
+        errors ++= errs
         modified
       }
 
       val target = makeTarget (file)
       val modified = visit (file)
-      if (modified > target.lastModified) {
-        logProcess (file, processName)
-        compile (deps, target)
-        target setLastModified startTime
-      }
-      (target, modified)
+      errors ++= (
+        if (modified > target.lastModified) {
+          logProcess (file, processName)
+          val errs = compile (deps, target)
+          if (errs.length == 0) {
+            target setLastModified startTime
+          }
+          errs
+        } else {
+          Array[ResourceError] ()
+        })
+      (target, modified, errors)
     }
   }
 
@@ -145,7 +167,8 @@ class ResourceCompiler (startTime: Long, charset: Charset,
    * Factory for generating resource processors that use JSDoc style annotations
    * for declaring dependencies (and have tools that compile multiple files as a unit)
    */
-  def JsDocProcessor (ext: String, name: String) (compiler: (Iterable[File], File) => Unit) =
+  def JsDocProcessor (ext: String, name: String) 
+                     (compiler: (Iterable[File], File) => Seq[ResourceError]) =
     new JsDocProcessor {
       override val fileExt = ext
       override val processName = name
@@ -157,7 +180,7 @@ class ResourceCompiler (startTime: Long, charset: Charset,
    * on its dependencies, and invoke an appropriate tool to concatenate and minify it
    * all together. Outputs into an appropriately named file and returns the `File` instance.
    */
-  lazy val fileExtToProcessor: Map[String, (File => (File, Long))] = Map (
+  lazy val fileExtToProcessor: Map[String, (File => (File, Long, Seq[ResourceError]))] = Map (
     ".html" -> { file =>
       logVisit (file)
       visitedFiles += file
@@ -196,8 +219,8 @@ class ResourceCompiler (startTime: Long, charset: Charset,
             aggFile, charset)
         }
 
-        val (out, modified) = fileExtToProcessor(ext)(aggFile)
-        (stor, atname, injParent, injName, out, modified)
+        val (out, modified, errs) = fileExtToProcessor(ext)(aggFile)
+        (stor, atname, injParent, injName, out, modified, errs)
       }
 
       val modified = deps.foldLeft(file lastModified) {
@@ -207,7 +230,7 @@ class ResourceCompiler (startTime: Long, charset: Charset,
       if (modified > target.lastModified) {
         logProcess (file, "Jsoup")
 
-        for ((stor, atname, injParent, injName, out, _) <- deps) {
+        for ((stor, atname, injParent, injName, out, _, _) <- deps) {
           // inject the output into the document
           getCompilableNodes(stor, atname) foreach (_ remove)
           val inj = doc createElement injName
@@ -248,7 +271,7 @@ class ResourceCompiler (startTime: Long, charset: Charset,
         Files write (doc html, target, charset)
         target setLastModified startTime
       }
-      (target, modified)
+      (target, modified, Array concat ((deps map (_._7.toArray)): _*))
     },
 
     ".js" -> JsDocProcessor(".js", "the Closure Compiler") { (files, target) =>
@@ -291,10 +314,10 @@ class ResourceCompiler (startTime: Long, charset: Charset,
       val compiler = new jscomp.Compiler;
       val res = compiler compile (externs, srcFiles, opts)
 
-      // mimics the behaviour of the command-line Closure Compiler, also falls in line
-      // with the other tools that exit the process on failure
-      if (res.errors.length > 0) {
-        System exit res.errors.length
+      val errs = res.errors map { err =>
+        new ResourceError {
+          override def toString = err.toString
+        }
       }
     
       // add the last modified stamp and wrap everything in a closure
@@ -311,6 +334,8 @@ class ResourceCompiler (startTime: Long, charset: Charset,
       ow newLine;
       ow write "})()"
       ow close;
+
+      errs
     },
 
     ".soy" -> new JsDocProcessor {
@@ -331,7 +356,9 @@ class ResourceCompiler (startTime: Long, charset: Charset,
             }},
             null) mkString,
           target, charset)
+        Array[ResourceError]()
       }
+      
     },
 
     ".css" -> JsDocProcessor(".css", "Closure Stylesheets") { (files, target) =>
@@ -340,6 +367,8 @@ class ResourceCompiler (startTime: Long, charset: Charset,
                "--allow-unrecognized-functions",
                "--output-file", target getPath)
           ++ files.map(_ getPath))
+      
+      Array[ResourceError]()
     }
   )
 }
