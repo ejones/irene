@@ -8,6 +8,8 @@ scalaVersion := "2.9.1"
 
 assemblySettings
 
+assembly <<= (assembly, streams) map distFromTarget
+
 jarName in assembly <<= (name, version) { (n, v) => n + "-" + v + ".jar" }
 
 libraryDependencies ++= Seq(
