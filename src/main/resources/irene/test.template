@@ -5,6 +5,7 @@
         <title>%NAME%</title>
         <link rel=stylesheet type=text/css href=B.css>
         <link rel=stylesheet href=C.css>
+        <link rel="stylesheet/less" href="ABC.less">
         <style>
             body {
                 background-color: red;
@@ -53,3 +54,16 @@ document.body.appendChild(soy.renderAsFragment(%NAME%Views.helloWorld))
 {template .helloWorld}
   Hello, world!
 {/template}
+%%FILE %NAME%/ABC.less
+@import "%NAME%/DEF.less";
+a {
+    b {
+        font-size: (1px + 2px);
+    }
+}
+%%FILE %NAME%/DEF.less
+a {
+    b {
+        color: crimson;
+    }
+}

@@ -110,8 +110,40 @@ class ResourceCompiler (startTime: Long, charset: Charset,
   def defaultTarget (f: File) = new File (f.base + ".min" + f.extension)
 
   def logProcess (f: File, name: String) =
-    logger info ("Processing " + f.getPath + " with " + name)
-  def logVisit (f: File) = logger info ("Checking " + f.getPath)
+    logger log (Level.INFO, "Processing {0} with {1}", Array[Object] (f.getPath, name))
+  def logVisit (f: File) = logger log (Level.FINE, "Checking {0}", Array[Object] (f.getPath))
+
+  def pipedProc_ (cmd: Seq[String], silent: Boolean) = {
+    if (!silent) {
+      logger log (Level.INFO, "{0}", Array (new Object {
+        override def toString = (cmd mkString " ")
+      }))
+    }
+    var pb = new java.lang.ProcessBuilder (cmd: _*)
+    pb redirectErrorStream true
+    pb start
+  }
+  
+  def pipedProc (cmd: String*) = pipedProc_ (cmd, false)
+  def pipedProcSilent (cmd: String*) = pipedProc_ (cmd, true)
+  
+  def processLines (p: java.lang.Process): Iterator[String] = {
+    val br = new java.io.BufferedReader (new java.io.InputStreamReader (p getInputStream))
+    Iterator continually (br readLine) takeWhile (_ ne null)
+  }
+
+  def checkOutput (p: java.lang.Process): Either[String, Int] = {
+    var output = processLines (p) mkString;
+    var retcode = p waitFor;
+    if (retcode == 0) {
+      Left (output)
+    } else {
+      print (output)
+      Right (retcode)
+    }
+  }
+
+  var lesscPresent = true
 
   /**
    * Base class for generating resource processors that use JSDoc style annotations
@@ -163,6 +195,12 @@ class ResourceCompiler (startTime: Long, charset: Charset,
     }
   }
 
+  lazy val nonSpacePat = java.util.regex.Pattern compile "\\S+"
+  
+  def undefinedCompResult = 
+      (new File ("/dev/null"), 0L,
+       Array (new ResourceError {}): Seq[ResourceError])
+
   /**
    * Factory for generating resource processors that use JSDoc style annotations
    * for declaring dependencies (and have tools that compile multiple files as a unit)
@@ -197,26 +235,35 @@ class ResourceCompiler (startTime: Long, charset: Charset,
       // get all the link and script tags that point to valid file locations
       // (i.e., relative paths), and inline scripts and styles, and aggregate
       // and compile them with the appropriate compilers
-      val deps = for ((stor, atname, ext, injParent, injName, sep) <- Array (
-              ("link[rel=stylesheet][href], style", "href", ".css",
-                  doc head, "style", "\n"),
-              ("script", "src", ".js", doc body, "script", ";"))) yield {
+      val deps = for ((stor, atname, ext, dblExt, injParent, injName, sep, rfmt) <- Array (
+              ("link[rel=stylesheet][href], style", "href", ".css", false,
+                  doc head, "style", "\n", "/** @requires \"%s\" */\n"),
+              ("link[rel=stylesheet/less][href]", "href", ".less", true,
+                  doc head, "style", "\n", "@import \"%s\";"),
+              ("script", "src", ".js", false,
+                  doc body, "script", ";", "/** @requires \"%s\" */\n"))) yield {
 
-        var aggFile = new File (file.getPath + ".__deps__" + ext)
+        var aggPath = file.getPath + ".__deps__" + ext
+        if (dblExt) {
+          aggPath += ext
+        }
+        
+        var aggFile = new File (aggPath)
+
+        val depString = 
+            getCompilableNodes(stor, atname) map { elem =>
+              if (elem hasAttr atname) {
+                visitedFiles += file getSibling (elem attr atname)
+                rfmt format (elem attr atname replace ("\\", "\\\\"))
+              } else {
+                elem.data + sep
+              }
+            } mkString
 
         // we (re)generate an aggregate file as necessary. For references to
         // other files, we generate a line in the aggregate file 
         if (file.lastModified > aggFile.lastModified) {
-          Files write (
-            getCompilableNodes(stor, atname) map { elem =>
-              if (elem hasAttr atname) {
-                "/** @requires \"" + (
-                  elem attr atname replace ("\\", "\\\\")) + "\" */\n"
-              } else {
-                elem.data + sep
-              }
-            } mkString,
-            aggFile, charset)
+          Files write (depString, aggFile, charset)
         }
 
         val (out, modified, errs) = fileExtToProcessor(ext)(aggFile)
@@ -272,6 +319,57 @@ class ResourceCompiler (startTime: Long, charset: Charset,
         target setLastModified startTime
       }
       (target, modified, Array concat ((deps map (_._7.toArray)): _*))
+    },
+    
+    ".less" -> { file =>
+      visitedFiles += file
+    
+      val lessc = 
+        if (!lesscPresent) null
+        else {
+          // -M prints out all the file dependencies
+          try pipedProcSilent ("lessc", file getPath, "-M", "x")
+          catch {
+            case e: java.io.IOException =>
+              lesscPresent = false
+              null
+          }
+        }
+
+      if (lessc == null) {
+        logger severe "lessc not found!"
+        undefinedCompResult
+
+      } else {
+        checkOutput (lessc) .left flatMap { depline =>
+          assert (depline startsWith "x: ")
+          val depM = nonSpacePat matcher (depline substring 3)
+          val deps = (Stream continually (if (depM find) depM group else null)
+                             takeWhile (_ ne null)
+                             map (new File (_)))
+
+          visitedFiles ++= deps
+
+          val target = new File (file.base + ".min.css")
+          val modified = deps.foldLeft(0L) { (acc, nxt) => math max (acc, nxt lastModified) }
+
+          if (modified > target.lastModified) {
+            logProcess (file, "LESS CSS")
+            checkOutput (pipedProc ("lessc", "-x", file getPath)) .left map { s =>
+                Files write (s, target, charset)
+                (target, modified)
+            }
+          } else {
+            Left ((target, modified))
+          }
+        } match {
+          case Right (errcode) =>
+            undefinedCompResult
+          case Left ((tgt, mod)) =>
+            (tgt, mod, Array[ResourceError]())
+        }
+
+      }
     },
 
     ".js" -> JsDocProcessor(".js", "the Closure Compiler") { (files, target) =>
