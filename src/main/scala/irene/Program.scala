@@ -57,9 +57,9 @@ object Program {
 
       // monitor compilable files and reload
       case "develop" => {
+        val visitedFiles = collection.mutable.Set[ResourceCompiler.File]()
         while (true) {
           val startTime = System.currentTimeMillis
-          val visitedFiles = collection.mutable.Set[ResourceCompiler.File]()
 
           val errs = ResourceCompiler (pathArgAtIndex(1), defaultCharset, visitedFiles)
 
