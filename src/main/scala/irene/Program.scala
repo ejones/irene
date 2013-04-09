@@ -3,9 +3,9 @@ package irene
 import annotation.tailrec
 import collection.JavaConversions._
 import java.io.{File, InputStreamReader}
-import java.lang.{StringBuilder, Thread}
+import java.lang.{StringBuilder, Thread, System}
 import java.nio.charset.Charset
-import java.util.logging.Logger
+import java.util.logging.{Logger, LogRecord, Level, ConsoleHandler}
 
 import com.google.common.io.{CharStreams, Files}
 
@@ -16,8 +16,31 @@ object Program {
   lazy val defaultCharset = Charset forName "UTF-8"
   lazy val logger = Logger getLogger classOf[Program].getName
 
-  def main (args: Array[String]): Unit = {
+  def main (cargs: Array[String]): Unit = {
+    val (verbose, args) = 
+      if (cargs(0) == "verbose") {
+        (true, cargs slice (1, Int.MaxValue))
+      } else {
+        (false, cargs)
+      }
+  
+    // REVIEW - set up root logger with our custom formatter, level
+    val rootLogger = Logger getLogger ""
+    val cHandlers = rootLogger getHandlers() filter (_.isInstanceOf[ConsoleHandler])
+    
+    cHandlers foreach { h =>
+      h setFormatter (new Formatter (System.console != null))
+      h setLevel (
+        if (verbose) Level.FINE
+        // HACK
+        else if (Array ("develop", "create") contains args(0)) Level.INFO
+        else Level.WARNING)
+    }
 
+    processArgs (args)
+  }
+
+  def processArgs (args: Array[String]) {
     def pathArgAtIndex (idx: Int) = if (args.length > idx) args(idx) else "."
 
     if (args.length <= 1) {
@@ -79,5 +102,24 @@ object Program {
       }
 
     }
+  }
+}
+
+class Formatter (colorize: Boolean) extends java.util.logging.Formatter {
+  override def format (record: LogRecord): String = {
+    val lvl = record.getLevel
+    val (ansi, name) =
+      lvl match {
+           case x if (x eq ResourceCompiler.SUCCESS) => ("2m", None) // green
+           case Level.SEVERE => ("1;1m", None) // RED
+           case Level.WARNING => ("3;1m", None) // YELLOW
+           case _ => ("6m", Some ("INFO")) // cyan
+      }
+
+    ("[" +
+      (if (colorize) "\u001b[3" + ansi else "") +
+      (name getOrElse (lvl toString) toLowerCase) +
+      (if (colorize) "\u001b[0m" else "") +
+      "] " + formatMessage (record) + "\n")
   }
 }

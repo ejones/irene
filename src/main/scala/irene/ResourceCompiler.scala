@@ -25,6 +25,10 @@ trait ResourceError {
 
 object ResourceCompiler {
 
+  protected class Level_ (s: String, v: Int) extends Level (s, v)
+
+  val SUCCESS = new Level_ ("SUCCESS", Level.WARNING.intValue)
+
   /** Adds functionality to java.io.File helpful for the compiler */
   class File (pathname: String) extends java.io.File (pathname) {
     lazy val (base, extension) = {
@@ -61,15 +65,26 @@ object ResourceCompiler {
              visitedFiles: collection.mutable.Set[File] =
                            collection.mutable.Set[File]()): Seq[ResourceError] = {
 
-    def compile (file: File): Seq[ResourceError] = {
-      (new ResourceCompiler (math.round(System.currentTimeMillis / 1000.0) * 1000L,
-                            charset, visitedFiles)
-        .fileExtToProcessor(file.extension)(file))._3
+    val nonCompile = (false, Array[ResourceError](): Seq[ResourceError])
+
+    def compile (file: File): (Boolean, Seq[ResourceError]) = {
+      val startTime = math.round(System.currentTimeMillis / 1000.0) * 1000L
+      val (target, mod, errs) =
+        (new ResourceCompiler (startTime, charset, visitedFiles)
+          .fileExtToProcessor(file.extension)(file))
+      if (target.lastModified >= startTime) {
+        if (errs.length == 0) {
+          logger log (SUCCESS, "Compiled {0} -> {1}", Array[Object] (file.getPath, target.getPath))
+        }
+        (true, errs)
+      } else {
+        (false, errs)
+      }
     }
 
-    def visitDir (dir: File): Seq[ResourceError] = {
+    def visitDir (dir: File): (Boolean, Seq[ResourceError]) = {
       val targetableJs = dir.getName + ".js"
-      dir.listFiles map (File fromJavaFile _) flatMap { file =>
+      (dir.listFiles map (File fromJavaFile _) map { file: File =>
         if (file isFile) {
           val name = file.getName
           if (!file.isGen && (file.extension == ".html"
@@ -77,25 +92,34 @@ object ResourceCompiler {
                               || name == targetableJs)) {
             compile (file)
           } else {
-            Array[ResourceError]()
+            nonCompile
           }
         } else if (file isDirectory) {
           visitDir (file)
         } else {
-          Array[ResourceError]()
+          nonCompile
         }
+      }).foldLeft((false, Array[ResourceError](): Seq[ResourceError])) {
+        case ((anyCompile, allErrs), (didCompile, errs)) =>
+          (anyCompile || didCompile, allErrs ++ errs)
       }
     }
 
     val file = new File (filepath)
-    if (file isFile) {
-      compile (file)
-    } else if (file isDirectory) {
-      visitDir (file getCanonicalFile)
-    } else {
-      Array[ResourceError]()
-    }
+    val (anyComp, errs) =
+      if (file isFile) {
+        compile (file)
+      } else if (file isDirectory) {
+        visitDir (file getCanonicalFile)
+      } else {
+        nonCompile
+      }
 
+    if (!anyComp) {
+      logger log (SUCCESS, "Everything up-to-date")
+    }
+    
+    errs
   }
 
 }
@@ -157,7 +181,7 @@ class ResourceCompiler (startTime: Long, charset: Charset,
 
     def apply (file: File) = {
       val deps = LinkedHashSet[File]()
-      var errors = ArrayBuffer[ResourceError]()
+      val errors = ArrayBuffer[ResourceError]()
 
       def visit (file: File): Long = {
         val (dep, modified, errs) = 
@@ -322,6 +346,7 @@ class ResourceCompiler (startTime: Long, charset: Charset,
     },
     
     ".less" -> { file =>
+      logVisit (file)
       visitedFiles += file
     
       val lessc = 
