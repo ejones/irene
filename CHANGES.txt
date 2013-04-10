@@ -1,3 +1,13 @@
+2013-04-09
+----------
+- adds support for LESS CSS
+- improved development reloader:
+    - stays alive after errors in JavaScript and LESS compilation
+- improved logging:
+    - colorized output
+    - formatted on one line
+    - adjustable verbosity
+
 2012-07-28
 ----------
 - JavaScript code is now wrapped in closures on output.

@@ -7,6 +7,7 @@ Irene is a small tool that simplifies things by picking up resources' dependenci
 
 Source files are processed as follows:
 
+* *new:* **LESS** files are processed with [LESS CSS](http://lesscss.org/)
 * **CSS** files are processed with [Google Closure Stylesheets](http://code.google.com/p/closure-stylesheets/)
 * **templates (.soy)** are processed with [Google Closure (Soy) Templates](https://developers.google.com/closure/templates/)
 * **JavaScript** files are processed with the [Google Closure Compiler](https://developers.google.com/closure/compiler/)
@@ -14,7 +15,7 @@ Source files are processed as follows:
 
 ## Quick Start
 
-Irene runs on the JVM. Pick up the [latest zip](https://github.com/downloads/ejones/irene/irene-latest.zip), extract `irene.jar` and run::
+Irene runs on the JVM. Pick up the [latest zip](https://github.com/ejones/irene-dist/archive/master.zip), extract `irene.jar` and run::
 
     java -jar irene.jar create hello
 
@@ -141,4 +142,4 @@ There are tools like [plovr](http://plovr.org/) and [Web Resource Optimizer for 
 After cloning the [Git repository](https://github.com/ejones/irene), you will need to use [sbt](https://github.com/harrah/xsbt/wiki) to work on the project.
 
 
-Copyright (C) 2012 by Evan Jones. Licensed under the MIT License - see LICENSE.txt for details.
+Copyright (C) 2012-2013 by Evan Jones. Licensed under the MIT License - see LICENSE.txt for details.
