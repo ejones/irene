@@ -8,22 +8,31 @@ object IreneBuild extends Build {
     IO copyFile (a, b)
   }
 
+  def mkdir (tgt: File, s: TaskStreams): Unit = {
+    s.log info ("mkdir "+tgt.getPath)
+    IO createDirectory tgt
+  }
+
   def zip (inp: Traversable[(File, String)], out: File, s: TaskStreams): Unit = {
     s.log info ("zip "+(inp map (_._1.getPath) mkString " ")+" "+out.getPath)
     IO zip (inp, out)
   }
 
   def distFromTarget (f: File, s: TaskStreams): File = {
-    var tgtDir = f.getParentFile
-    var projDir = tgtDir.getParentFile // REVIEW
-    cp (f, new File (tgtDir, "irene-latest.jar"), s)
-    zip (
-      (f, "irene-latest/irene.jar") +:
-        (Array ("CHANGES.txt", "LICENSE.txt", "README.md") map { nm: String =>
-          (new File (projDir, nm), "irene-latest/"+nm)
-         }),
-      new File (tgtDir, "irene-latest.zip"),
-      s)
+    val tgtDir = f.getParentFile
+    val projDir = tgtDir.getParentFile // REVIEW
+    val distDir = new File (tgtDir, "irene-latest")
+
+    val zEntries = 
+      (((f, "irene.jar") +:
+          (Array ("CHANGES.txt", "LICENSE.txt", "README.md")
+                map (f => (new File (projDir, f), f))))
+       map { case (item, nm) =>
+          cp (item, new File (distDir, nm), s)
+          (item, "irene-latest/"+(nm))
+       })
+
+    zip (zEntries, new File (tgtDir, "irene-latest.zip"), s)
     f
   }
 
