@@ -259,13 +259,14 @@ class ResourceCompiler (startTime: Long, charset: Charset,
       // get all the link and script tags that point to valid file locations
       // (i.e., relative paths), and inline scripts and styles, and aggregate
       // and compile them with the appropriate compilers
-      val deps = for ((stor, atname, ext, dblExt, injParent, injName, sep, rfmt) <- Array (
-              ("link[rel=stylesheet][href], style", "href", ".css", false,
+      val deps = 
+        Array(("link[rel=stylesheet][href], style", "href", ".css", false,
                   doc head, "style", "\n", "/** @requires \"%s\" */\n"),
               ("link[rel=stylesheet/less][href]", "href", ".less", true,
                   doc head, "style", "\n", "@import \"%s\";"),
               ("script", "src", ".js", false,
-                  doc body, "script", ";", "/** @requires \"%s\" */\n"))) yield {
+                  doc body, "script", ";", "/** @requires \"%s\" */\n")) flatMap {
+        case (stor, atname, ext, dblExt, injParent, injName, sep, rfmt) =>
 
         var aggPath = file.getPath + ".__deps__" + ext
         if (dblExt) {
@@ -286,12 +287,18 @@ class ResourceCompiler (startTime: Long, charset: Charset,
 
         // we (re)generate an aggregate file as necessary. For references to
         // other files, we generate a line in the aggregate file 
-        if (file.lastModified > aggFile.lastModified) {
-          Files write (depString, aggFile, charset)
+        if ((depString.length > 0 || aggFile.exists) && file.lastModified > aggFile.lastModified) {
+          if (depString.length == 0) {
+            aggFile.delete
+          } else {
+            Files write (depString, aggFile, charset)
+          }
         }
 
-        val (out, modified, errs) = fileExtToProcessor(ext)(aggFile)
-        (stor, atname, injParent, injName, out, modified, errs)
+        Some (aggFile) filter (_ exists) map { f =>
+            val (out, modified, errs) = fileExtToProcessor(ext)(f)
+            (stor, atname, injParent, injName, out, modified, errs)
+        }
       }
 
       val modified = deps.foldLeft(file lastModified) {
@@ -303,18 +310,22 @@ class ResourceCompiler (startTime: Long, charset: Charset,
 
         for ((stor, atname, injParent, injName, out, _, _) <- deps) {
           // inject the output into the document
-          getCompilableNodes(stor, atname) foreach (_ remove)
           val inj = doc createElement injName
           for (s <- List ("\n", Files toString (out, charset), "\n")) {
             inj appendChild new DataNode (s, "")
           }
-          injParent appendChild inj
+          val cnodes = getCompilableNodes (stor, atname)
+          cnodes slice (0, cnodes.length - 1) foreach (_ remove)
+          cnodes.last replaceWith inj
         }
 
         // update the observable $LAST_MODIFIED
         val stamp = doc createElement "script"
         stamp appendChild new DataNode ("$LAST_MODIFIED = new Date(" + startTime + ")", "")
-        doc.body.children.last before stamp
+        (doc getElementsByTag "script" match {
+          case ts if ts.length > 0 => ts.first
+          case _ => doc.body.children.last
+        }) before stamp
 
         // try to compress whitespace in output (we could remove it, but that could
         // create large lines which cause problems in proxies etc.)
