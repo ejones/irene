@@ -19,7 +19,7 @@ object IreneBuild extends Build {
   }
 
   def distFromTarget (f: File, s: TaskStreams): File = {
-    val tgtDir = f.getParentFile
+    val tgtDir = f getParentFile() /* scala-2.9.x */ getParentFile()
     val projDir = tgtDir.getParentFile // REVIEW
     val distDir = new File (tgtDir, "irene-latest")
 
