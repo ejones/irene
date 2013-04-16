@@ -33,11 +33,15 @@ object Program {
       h setLevel (
         if (verbose) Level.FINE
         // HACK
-        else if (Array ("develop", "create") contains args(0)) Level.INFO
+        else if (Array ("develop", "update", "create") contains args(0)) Level.INFO
         else Level.WARNING)
     }
 
-    processArgs (args)
+    try {
+      processArgs (args)
+    } catch {
+      case e => logThrowable (e)
+    }
   }
 
   def processArgs (args: Array[String]) {
@@ -79,19 +83,27 @@ object Program {
       }
 
       // monitor compilable files and reload
-      case "develop" => {
+      case cmd @ ("update" | "develop") => {
         val visitedFiles = collection.mutable.Set[ResourceCompiler.File]()
         while (true) {
           val startTime = System.currentTimeMillis
 
-          val errs = ResourceCompiler (pathArgAtIndex(1), defaultCharset, visitedFiles)
+          val errs = 
+            try {
+              ResourceCompiler (pathArgAtIndex(1), defaultCharset, visitedFiles,
+                                  update = cmd == "update")
+            } catch {
+              case e =>
+                logThrowable (e)
+                Array (new ResourceError {}): Seq[ResourceError]
+            }
 
           if (errs.length > 0) {
             logger severe (errs.length + " error(s) found! See console for details")
           }
           logger info ("Waiting for changes...")
           @tailrec def monitor: Unit = {
-            Thread sleep 2000
+            Thread sleep 750
             visitedFiles find (_.lastModified > startTime) match {
               case Some(f) => logger info (f.getPath + " modified...")
               case _ => monitor
@@ -103,6 +115,12 @@ object Program {
 
     }
   }
+
+  def logThrowable (e: java.lang.Throwable) = {
+    var sw = new java.io.StringWriter;
+    e printStackTrace new java.io.PrintWriter (sw)
+    logger severe ("\n" + sw)
+  }
 }
 
 class Formatter (colorize: Boolean) extends java.util.logging.Formatter {
@@ -113,6 +131,7 @@ class Formatter (colorize: Boolean) extends java.util.logging.Formatter {
            case x if (x eq ResourceCompiler.SUCCESS) => ("2m", None) // green
            case Level.SEVERE => ("1;1m", None) // RED
            case Level.WARNING => ("3;1m", None) // YELLOW
+           case ResourceCompiler.UPDATE => ("6m", None)
            case _ => ("6m", Some ("INFO")) // cyan
       }
 

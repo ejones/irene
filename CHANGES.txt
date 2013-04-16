@@ -1,3 +1,8 @@
+2013-04-16
+----------
+- adds a new "update" mode that streams JavaScript "diffs" that can be used by
+  a server to live-reload/update a page (usually in development)
+
 2013-04-09
 ----------
 - adds support for LESS CSS

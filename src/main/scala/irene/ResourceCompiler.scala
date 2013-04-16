@@ -8,6 +8,7 @@ import java.util.logging.{Level, Logger}
 
 import com.google.common.io.Files
 import com.google.common.css
+import com.google.gson.Gson
 import com.google.javascript.jscomp
 import com.google.javascript.jscomp.JSSourceFile
 import com.google.template.soy.SoyFileSet
@@ -28,6 +29,7 @@ object ResourceCompiler {
   protected class Level_ (s: String, v: Int) extends Level (s, v)
 
   val SUCCESS = new Level_ ("SUCCESS", Level.WARNING.intValue)
+  val UPDATE = new Level_ ("UPDATE", Level.INFO.intValue)
 
   /** Adds functionality to java.io.File helpful for the compiler */
   class File (pathname: String) extends java.io.File (pathname) {
@@ -63,16 +65,17 @@ object ResourceCompiler {
    */
   def apply (filepath: String, charset: Charset,
              visitedFiles: collection.mutable.Set[File] =
-                           collection.mutable.Set[File]()): Seq[ResourceError] = {
+                           collection.mutable.Set[File](),
+             update: Boolean = false): Seq[ResourceError] = {
 
     val nonCompile = (false, Array[ResourceError](): Seq[ResourceError])
 
     def compile (file: File): (Boolean, Seq[ResourceError]) = {
       val startTime = math.round(System.currentTimeMillis / 1000.0) * 1000L
       val (target, mod, errs) =
-        (new ResourceCompiler (startTime, charset, visitedFiles)
+        (new ResourceCompiler (startTime, charset, visitedFiles, update)
           .fileExtToProcessor(file.extension)(file))
-      if (target.lastModified >= startTime) {
+      if (target.lastModified >= startTime - 2000) {
         if (errs.length == 0) {
           logger log (SUCCESS, "Compiled {0} -> {1}", Array[Object] (file.getPath, target.getPath))
         }
@@ -126,7 +129,8 @@ object ResourceCompiler {
 import ResourceCompiler._
 
 class ResourceCompiler (startTime: Long, charset: Charset,
-                        visitedFiles: collection.mutable.Set[File]) {
+                        visitedFiles: collection.mutable.Set[File],
+                        update: Boolean) {
 
   /**
    * converts "foo.bar" to "foo.min.bar"
@@ -297,7 +301,8 @@ class ResourceCompiler (startTime: Long, charset: Charset,
 
         Some (aggFile) filter (_ exists) map { f =>
             val (out, modified, errs) = fileExtToProcessor(ext)(f)
-            (stor, atname, injParent, injName, out, modified, errs)
+            val didCompile = out.lastModified >= startTime - 2000
+            (stor, atname, injParent, injName, out, modified, errs, ext, didCompile)
         }
       }
 
@@ -308,15 +313,36 @@ class ResourceCompiler (startTime: Long, charset: Charset,
       if (modified > target.lastModified) {
         logProcess (file, "Jsoup")
 
-        for ((stor, atname, injParent, injName, out, _, _) <- deps) {
+        for ((stor, atname, injParent, injName, out, _, _, ext, didCompile) <- deps) {
           // inject the output into the document
-          val inj = doc createElement injName
-          for (s <- List ("\n", Files toString (out, charset), "\n")) {
+          val inj = doc createElement injName attr ("id", "irene" + ext)
+          var content = Files toString (out, charset)
+          for (s <- List ("\n", content, "\n")) {
             inj appendChild new DataNode (s, "")
           }
           val cnodes = getCompilableNodes (stor, atname)
           cnodes slice (0, cnodes.length - 1) foreach (_ remove)
           cnodes.last replaceWith inj
+
+          // in update mode, send JavaScript commands that update the document
+          if (didCompile && update) {
+            logger log (UPDATE, "\n" + (ext match {
+              case ".less" | ".css" => {
+                val gson = new Gson;
+                 ("var d=document,n=d.getElementById("+(gson toJson (inj id))+");" +
+                  "n&&n.parentNode&&n.parentNode.removeChild(n)\n" +
+                  // HACK -- assumes that injParent is a single element (<HEAD> or <BODY>)
+                  "var injp=d.getElementsByTagName("+(gson toJson (injParent tagName))+")[0],\n" +
+                  " tn=(injp.insertAdjacentHTML('beforeend'," +
+                      "'<style>body *{-webkit-transition:0.3s all ease !important}</style>')," +
+                      "injp.lastChild)\n" +
+                  "injp.insertAdjacentHTML('beforeend',"+(gson toJson (inj toString))+");" +
+                  "setTimeout(function(){tn&&injp.removeChild(tn);},350);")
+              }
+              case _ =>
+                "window.location.reload();"
+            }))
+          }
         }
 
         // update the observable $LAST_MODIFIED
