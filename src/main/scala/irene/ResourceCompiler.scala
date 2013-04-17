@@ -166,6 +166,7 @@ class ResourceCompiler (startTime: Long, charset: Charset,
     if (retcode == 0) {
       Left (output)
     } else {
+      logger severe output
       Right ((retcode, output))
     }
   }
