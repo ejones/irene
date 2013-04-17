@@ -1,7 +1,8 @@
-2013-04-16
+2013-04-17
 ----------
 - adds a new "update" mode that streams JavaScript "diffs" that can be used by
   a server to live-reload/update a page (usually in development)
+- adds a heads-up display of compilation errors on the page
 
 2013-04-09
 ----------

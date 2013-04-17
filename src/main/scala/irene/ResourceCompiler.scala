@@ -160,14 +160,13 @@ class ResourceCompiler (startTime: Long, charset: Charset,
     Iterator continually (br readLine) takeWhile (_ ne null)
   }
 
-  def checkOutput (p: java.lang.Process): Either[String, Int] = {
-    var output = processLines (p) mkString;
+  def checkOutput (p: java.lang.Process): Either[String, (Int, String)] = {
+    var output = processLines (p) mkString "\n";
     var retcode = p waitFor;
     if (retcode == 0) {
       Left (output)
     } else {
-      print (output)
-      Right (retcode)
+      Right ((retcode, output))
     }
   }
 
@@ -225,9 +224,12 @@ class ResourceCompiler (startTime: Long, charset: Charset,
 
   lazy val nonSpacePat = java.util.regex.Pattern compile "\\S+"
   
-  def undefinedCompResult = 
+  def undefinedCompResult (obj: Object = null) = 
       (new File ("/dev/null"), 0L,
-       Array (new ResourceError {}): Seq[ResourceError])
+       Array (new ResourceError {
+                override def toString =
+                  if (obj == null) super.toString else obj.toString
+              }): Seq[ResourceError])
 
   /**
    * Factory for generating resource processors that use JSDoc style annotations
@@ -310,6 +312,36 @@ class ResourceCompiler (startTime: Long, charset: Charset,
                         (acc, next) => math.max (acc, next._6) }
       val target = defaultTarget (file)
 
+      val errs = Array concat ((deps map (_._7.toArray)): _*)
+      val shouldUpdate = update && errs.length == 0
+
+      if (errs.length > 0) {
+        logger log (UPDATE, """
+var d=window.document,b=d.body,n=d.getElementById("irene-error")
+n&&n.parentNode&&n.parentNode.removeChild(n)
+b.insertAdjacentHTML('beforeend', """+(new Gson() toJson ("""
+ <div id="irene-error" style="
+  font:19px Cabin;position:fixed;top:50%;bottom:50%;left:0;right:0;
+  background:rgba(68,68,68,0.7);color:#F0F0F0;overflow:hidden;
+  z-index:999999;-webkit-transition:0.25s all ease">
+  <link href="https://fonts.googleapis.com/css?family=Cabin" rel="stylesheet">
+  <div style="
+   position:absolute;top:25px;left:25px;right:25px;bottom:25px;border-radius:7px;
+   background:rgba(34,34,34,0.7);padding:0 25px">
+   <h2 style="color:#DC322F;font-size:32px;margin:15px 0 10px;text-rendering:optimizelegibility">Error</h2>
+   <pre style="
+    border:0 none;padding:0;margin:0 0 20px 0;color:inherit;background:transparent;
+    word-wrap:break-word;word-break:break-all;white-space:pre;white-space:pre-wrap;
+    font-family:Monaco,Menlo,Consolas,"Courier New",monospace;"
+    >"""+(errs mkString "\n\n")+"""</pre></div>
+  <button onclick="this.parentNode.style.top='101%'" style="
+   color:#AAA;cursor:pointer;font:inherit;font-size:42px;background:transparent;
+   border:0 none;position:absolute;top:40px;right:45px;line-height:28px;height:28px;
+   width:25px;padding:0">&times;</button></div>"""))+""")
+n=b.lastChild
+setTimeout(function(){n.style.top=n.style.bottom=0;},0)""")
+      }
+
       if (modified > target.lastModified) {
         logProcess (file, "Jsoup")
 
@@ -325,19 +357,21 @@ class ResourceCompiler (startTime: Long, charset: Charset,
           cnodes.last replaceWith inj
 
           // in update mode, send JavaScript commands that update the document
-          if (didCompile && update) {
+          if (didCompile && shouldUpdate) {
             logger log (UPDATE, "\n" + (ext match {
               case ".less" | ".css" => {
                 val gson = new Gson;
-                 ("var d=document,n=d.getElementById("+(gson toJson (inj id))+");" +
+                 ("var d=window.document,n=d.getElementById("+(gson toJson (inj id))+")," +
+                  " en=d.getElementById('irene-error')\n" +
                   "n&&n.parentNode&&n.parentNode.removeChild(n)\n" +
+                  "en&&(en.style.top='101%')\n" +
                   // HACK -- assumes that injParent is a single element (<HEAD> or <BODY>)
                   "var injp=d.getElementsByTagName("+(gson toJson (injParent tagName))+")[0],\n" +
                   " tn=(injp.insertAdjacentHTML('beforeend'," +
-                      "'<style>body *{-webkit-transition:0.3s all ease !important}</style>')," +
+                      "'<style>body *{-webkit-transition:0.25s all ease !important}</style>')," +
                       "injp.lastChild)\n" +
                   "injp.insertAdjacentHTML('beforeend',"+(gson toJson (inj toString))+");" +
-                  "setTimeout(function(){tn&&injp.removeChild(tn);},350);")
+                  "setTimeout(function(){tn&&injp.removeChild(tn);},263);")
               }
               case _ =>
                 "window.location.reload();"
@@ -379,7 +413,7 @@ class ResourceCompiler (startTime: Long, charset: Charset,
         Files write (doc html, target, charset)
         target setLastModified startTime
       }
-      (target, modified, Array concat ((deps map (_._7.toArray)): _*))
+      (target, modified, errs)
     },
     
     ".less" -> { file =>
@@ -400,7 +434,7 @@ class ResourceCompiler (startTime: Long, charset: Charset,
 
       if (lessc == null) {
         logger severe "lessc not found!"
-        undefinedCompResult
+        undefinedCompResult()
 
       } else {
         checkOutput (lessc) .left flatMap { depline =>
@@ -417,7 +451,7 @@ class ResourceCompiler (startTime: Long, charset: Charset,
 
           if (modified > target.lastModified) {
             logProcess (file, "LESS CSS")
-            checkOutput (pipedProc ("lessc", "-x", file getPath)) .left map { s =>
+            checkOutput (pipedProc ("lessc", "--no-color", "-x", file getPath)) .left map { s =>
                 Files write (s, target, charset)
                 (target, modified)
             }
@@ -425,8 +459,8 @@ class ResourceCompiler (startTime: Long, charset: Charset,
             Left ((target, modified))
           }
         } match {
-          case Right (errcode) =>
-            undefinedCompResult
+          case Right ((errcode, output)) =>
+            undefinedCompResult (output)
           case Left ((tgt, mod)) =>
             (tgt, mod, Array[ResourceError]())
         }
