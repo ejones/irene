@@ -1,3 +1,9 @@
+2013-05-02
+----------
+- now ignores non-JS HTML script tags
+- fixes a bug where terminal escape sequences and extraneous characters would
+  show up in the heads-up display for LESS "Unrecognized input" errors
+
 2013-04-17
 ----------
 - adds a new "update" mode that streams JavaScript "diffs" that can be used by

@@ -15,9 +15,14 @@
     <body>
         <h1>%NAME%</h1>
         <script src=B.js></script>
-        <script src=C.js></script>
+        <script type="text/javascript" src=C.js></script>
         <script>alert([aModule.num, bModule.num, cModule.num, $LAST_MODIFIED])</script>
-        <script>alert('hello!')</script>
+        <script type="text/javascript">alert('hello!')</script>
+
+        <script type="text/html" src="%NAME%.html"></script>
+        <script type="text/stuff">
+            Hello
+        </script>
     </body>
 </html>
 %%FILE %NAME%/A.css

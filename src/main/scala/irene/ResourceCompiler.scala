@@ -171,6 +171,8 @@ class ResourceCompiler (startTime: Long, charset: Charset,
     }
   }
 
+  def stripPrefix (s: String, pfx: String) = if (s startsWith pfx) s substring (pfx length) else s
+
   var lesscPresent = true
 
   /**
@@ -271,7 +273,7 @@ class ResourceCompiler (startTime: Long, charset: Charset,
                   doc head, "style", "\n", "/** @requires \"%s\" */\n"),
               ("link[rel=stylesheet/less][href]", "href", ".less", true,
                   doc head, "style", "\n", "@import \"%s\";"),
-              ("script", "src", ".js", false,
+              ("script:not([type]), script[type=text/javascript]", "src", ".js", false,
                   doc body, "script", ";", "/** @requires \"%s\" */\n")) flatMap {
         case (stor, atname, ext, dblExt, injParent, injName, sep, rfmt) =>
 
@@ -425,7 +427,7 @@ setTimeout(function(){n.style.top=n.style.bottom=0;},0)""")
         if (!lesscPresent) null
         else {
           // -M prints out all the file dependencies
-          try pipedProcSilent ("lessc", file getPath, "-M", "x")
+          try pipedProcSilent ("lessc", "--no-color", file getPath, "-M", "x")
           catch {
             case e: java.io.IOException =>
               lesscPresent = false
@@ -438,7 +440,11 @@ setTimeout(function(){n.style.top=n.style.bottom=0;},0)""")
         undefinedCompResult()
 
       } else {
-        checkOutput (lessc) .left flatMap { depline =>
+        checkOutput (lessc)
+        // lessc still prepends the "x: " under errors, lawl
+        .right .map { case (code, out) => (code, stripPrefix (out, "x: ")) }
+        
+        .left flatMap { depline =>
           assert (depline startsWith "x: ")
           val depM = nonSpacePat matcher (depline substring 3)
           val deps = (Stream continually (if (depM find) depM group else null)
