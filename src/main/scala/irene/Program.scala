@@ -17,8 +17,9 @@ object Program {
   lazy val logger = Logger getLogger classOf[Program].getName
 
   def main (cargs: Array[String]): Unit = {
+    val farg = if (cargs.length > 0) cargs(0) else null
     val (verbose, args) = 
-      if (cargs(0) == "verbose") {
+      if (farg == "verbose") {
         (true, cargs slice (1, Int.MaxValue))
       } else {
         (false, cargs)
@@ -33,7 +34,7 @@ object Program {
       h setLevel (
         if (verbose) Level.FINE
         // HACK
-        else if (Array ("develop", "update", "create") contains args(0)) Level.INFO
+        else if (Array ("develop", "update", "create") contains farg) Level.INFO
         else Level.WARNING)
     }
 
