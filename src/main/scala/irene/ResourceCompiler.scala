@@ -141,12 +141,13 @@ class ResourceCompiler (startTime: Long, charset: Charset,
     logger log (Level.INFO, "Processing {0} with {1}", Array[Object] (f.getPath, name))
   def logVisit (f: File) = logger log (Level.FINE, "Checking {0}", Array[Object] (f.getPath))
 
+  def logUpdate (f: File, code: String) =
+    logger log (UPDATE, "{0}\n{1}", Array[Object] (f getPath, code))
+
   def pipedProc_ (cmd: Seq[String], silent: Boolean) = {
-    if (!silent) {
-      logger log (Level.INFO, "{0}", Array (new Object {
-        override def toString = (cmd mkString " ")
-      }))
-    }
+    logger log (if (silent) Level.FINE else Level.INFO, "{0}", Array (new Object {
+      override def toString = (cmd mkString " ")
+    }))
     var pb = new java.lang.ProcessBuilder (cmd: _*)
     pb redirectErrorStream true
     pb start
@@ -361,24 +362,24 @@ setTimeout(function(){n.style.top=n.style.bottom=0;},0)""")
 
           // in update mode, send JavaScript commands that update the document
           if (didCompile && shouldUpdate) {
-            logger log (UPDATE, "\n" + (ext match {
+            logUpdate (target, ext match {
               case ".less" | ".css" => {
                 val gson = new Gson;
-                 ("var d=window.document,n=d.getElementById("+(gson toJson (inj id))+")," +
-                  " en=d.getElementById('irene-error')\n" +
-                  "n&&n.parentNode&&n.parentNode.removeChild(n)\n" +
-                  "en&&(en.style.top='101%')\n" +
-                  // HACK -- assumes that injParent is a single element (<HEAD> or <BODY>)
-                  "var injp=d.getElementsByTagName("+(gson toJson (injParent tagName))+")[0],\n" +
-                  " tn=(injp.insertAdjacentHTML('beforeend'," +
-                      "'<style>body *{-webkit-transition:0.25s all ease !important}</style>')," +
-                      "injp.lastChild)\n" +
-                  "injp.insertAdjacentHTML('beforeend',"+(gson toJson (inj toString))+");" +
-                  "setTimeout(function(){tn&&injp.removeChild(tn);},263);")
+                ("var d=window.document,n=d.getElementById("+(gson toJson (inj id))+")," +
+                 " en=d.getElementById('irene-error')\n" +
+                 "n&&n.parentNode&&n.parentNode.removeChild(n)\n" +
+                 "en&&(en.style.top='101%')\n" +
+                 // HACK -- assumes that injParent is a single element (<HEAD> or <BODY>)
+                 "var injp=d.getElementsByTagName("+(gson toJson (injParent tagName))+")[0],\n" +
+                 " tn=(injp.insertAdjacentHTML('beforeend'," +
+                     "'<style>body *{-webkit-transition:0.25s all ease !important}</style>')," +
+                     "injp.lastChild)\n" +
+                 "injp.insertAdjacentHTML('beforeend',"+(gson toJson (inj toString))+");" +
+                 "setTimeout(function(){tn&&injp.removeChild(tn);},263);")
               }
               case _ =>
                 "window.location.reload();"
-            }))
+            })
           }
         }
 
