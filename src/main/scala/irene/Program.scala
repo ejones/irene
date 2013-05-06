@@ -17,12 +17,10 @@ object Program {
   lazy val logger = Logger getLogger classOf[Program].getName
 
   def main (cargs: Array[String]): Unit = {
-    val farg = if (cargs.length > 0) cargs(0) else null
-    val (verbose, args) = 
-      if (farg == "verbose") {
-        (true, cargs slice (1, Int.MaxValue))
-      } else {
-        (false, cargs)
+    val (varg, args) = 
+      cargs .headOption match {
+        case v @ Some ("verbose") => (v, cargs slice (1, Int.MaxValue))
+        case _ => (None, cargs)
       }
   
     // REVIEW - set up root logger with our custom formatter, level
@@ -32,10 +30,12 @@ object Program {
     cHandlers foreach { h =>
       h setFormatter (new Formatter (System.console != null))
       h setLevel (
-        if (verbose) Level.FINE
-        // HACK
-        else if (Array ("develop", "update", "create") contains farg) Level.INFO
-        else Level.WARNING)
+        (varg, cargs headOption) match {
+          case (Some (_), _) => Level.FINE
+          // HACK
+          case (_, Some("develop")) | (_, Some("update")) | (_, Some("create")) => Level.INFO
+          case _ => Level.WARNING
+        })
     }
 
     try {
