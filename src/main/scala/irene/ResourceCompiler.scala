@@ -320,7 +320,7 @@ class ResourceCompiler (startTime: Long, charset: Charset,
       val shouldUpdate = update && errs.length == 0
 
       if (errs.length > 0) {
-        logger log (UPDATE, """
+        logUpdate (target, """
 var d=window.document,b=d.body,n=d.getElementById("irene-error")
 n&&n.parentNode&&n.parentNode.removeChild(n)
 b.insertAdjacentHTML('beforeend', """+(new Gson() toJson ("""
