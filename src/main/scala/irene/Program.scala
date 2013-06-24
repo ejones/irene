@@ -50,7 +50,8 @@ object Program {
 
     if (args.length <= 1) {
       // TODO: specify input encoding at cmd line
-      ResourceCompiler (pathArgAtIndex(0), defaultCharset)
+      val errs = ResourceCompiler (pathArgAtIndex(0), defaultCharset)
+      noteResErrs (errs)
 
     } else args(0) match {
       // use a template to generate a project
@@ -99,9 +100,7 @@ object Program {
                 Array (new ResourceError {}): Seq[ResourceError]
             }
 
-          if (errs.length > 0) {
-            logger severe (errs.length + " error(s) found! See console for details")
-          }
+          noteResErrs (errs)
           logger info ("Waiting for changes...")
           @tailrec def monitor: Unit = {
             Thread sleep 750
@@ -114,6 +113,12 @@ object Program {
         }
       }
 
+    }
+  }
+
+  def noteResErrs (errs: Seq[ResourceError]) = {
+    if (errs.length > 0) {
+      logger severe (errs.length + " error(s) found! See console for details")
     }
   }
 

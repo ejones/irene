@@ -16,12 +16,19 @@ import com.google.template.soy.jssrc.SoyJsSrcOptions
 import org.jsoup.Jsoup
 import org.jsoup.nodes.{Element, DataNode, Document, Node, TextNode, Comment}
 import org.jsoup.select.NodeVisitor
+import scala.util.control.Exception.allCatch
 
 /**
  * Returned by compilations of different types
  */
 trait ResourceError {
   
+}
+
+object ResourceError {
+  def apply(obj: Object) = new ResourceError {
+    override def toString = obj toString;
+  }
 }
 
 object ResourceCompiler {
@@ -48,6 +55,13 @@ object ResourceCompiler {
   }
 
   lazy val logger = Logger getLogger classOf[ResourceCompiler].getName
+
+  def resourceCatch[T] (body: => T): Either[ResourceError, T] = {
+    (allCatch either body) .left map { t =>
+      logger severe t.toString
+      ResourceError (t)
+    }
+  }
 
   /**
    * Builds the resource tree rooted at the given file or directory. If
@@ -516,11 +530,7 @@ setTimeout(function(){n.style.top=n.style.bottom=0;},0)""")
       val compiler = new jscomp.Compiler;
       val res = compiler compile (externs, srcFiles, opts)
 
-      val errs = res.errors map { err =>
-        new ResourceError {
-          override def toString = err.toString
-        }
-      }
+      val errs = res.errors map (ResourceError (_))
     
       // add the last modified stamp and wrap everything in a closure
       val ow = Files newWriter (target, charset)
@@ -548,29 +558,65 @@ setTimeout(function(){n.style.top=n.style.bottom=0;},0)""")
       override def compile (files: Iterable[File], target: File) = {
         val builder = new SoyFileSet.Builder;
         files foreach (builder add _)
-        val sfs = builder build;
 
-        Files write (
-          sfs compileToJsSrc (
+        val jsSrc = resourceCatch {
+          // Closure (Soy) Templates just barf on errors, so wrap in try/catch
+          (builder build) compileToJsSrc (
             new SoyJsSrcOptions {{
               setShouldGenerateJsdoc (true);
               setCodeStyle (SoyJsSrcOptions.CodeStyle.CONCAT)
-            }},
-            null) mkString,
-          target, charset)
-        Array[ResourceError]()
+            }}, null)
+        }
+              
+        (jsSrc
+          .right .map { src => Files write (src mkString, target, charset) }
+          .left .toSeq .map (ResourceError (_)))
       }
       
     },
 
     ".css" -> JsDocProcessor(".css", "Closure Stylesheets") { (files, target) =>
-      css.compiler.commandline.ClosureCommandLineCompiler.main(
-        Array ("--allow-unrecognized-properties",
-               "--allow-unrecognized-functions",
-               "--output-file", target getPath)
-          ++ files.map(_ getPath))
+      val builder = (new css.JobDescriptionBuilder()
+            setAllowUnrecognizedFunctions  (true)
+            setAllowUnrecognizedProperties (true)
+            // setAllowKeyframes              (true)
+            setAllowWebkitKeyframes        (true)
+            setProcessDependencies         (true)
+            setSimplifyCss                 (true)
+
+            // In particular, this setting controls whether or not GSS raises errors
+            // for duplicate declarations, which is pretty common, so we disable this
+            //
+            // setEliminateDeadStyles         (true)
+
+            setGssFunctionMapProvider
+              (new css.compiler.gssfunctions.DefaultGssFunctionMapProvider))
+
+      for (file <- files) {
+        builder addInput (new css.SourceCode (file getPath, Files toString (file, charset)))
+      }
+
+      val job = builder.getJobDescription()
+
+      val errman = new css.compiler.ast.BasicErrorManager {
+        override def print (s: String) = logger log (Level.SEVERE, s)
+
+        def getErrors = this.errors
+      }
+
+      var treeResult = resourceCatch { new css.compiler.ast.GssParser (job inputs) parse }
       
-      Array[ResourceError]()
+      treeResult.right map { tree =>
+        new css.compiler.passes.PassRunner (job, errman) runPasses tree
+
+        val compacter = new css.compiler.passes.CompactPrinter (tree)
+        compacter runPass;
+
+        Files write (compacter getCompactPrintedString, target, charset)
+      }
+
+      errman generateReport;
+      (treeResult.left toSeq) ++ (errman .getErrors .toSeq map (ResourceError (_)))
     }
   )
 }
