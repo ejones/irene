@@ -101,6 +101,7 @@ object ResourceCompiler {
 
     def visitDir (dir: File): (Boolean, Seq[ResourceError]) = {
       val targetableJs = dir.getName + ".js"
+      visitedFiles += dir
       (dir.listFiles map (File fromJavaFile _) map { file: File =>
         if (file isFile) {
           val name = file.getName
