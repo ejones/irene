@@ -517,8 +517,14 @@ setTimeout(function(){n.style.top=n.style.bottom=0;},0)""")
       // and turn off JSDoc warnings because of our custom stuff
       opts setRenamingPolicy (jscomp.VariableRenamingPolicy.ALL,
                               jscomp.PropertyRenamingPolicy.OFF)
-      opts setWarningLevel (jscomp.DiagnosticGroups.NON_STANDARD_JSDOC,
-                            jscomp.CheckLevel.OFF)
+
+      // turn of some particularly annoying warnings for typical code that you encounter in the wild
+      for (opt <- Array (jscomp.DiagnosticGroups.NON_STANDARD_JSDOC,
+                         jscomp.DiagnosticGroups.DUPLICATE_VARS,
+                         jscomp.DiagnosticGroups.MISSING_PROPERTIES,
+                         jscomp.DiagnosticGroups.UNDEFINED_NAMES)) {
+        opts setWarningLevel (opt, jscomp.CheckLevel.OFF)
+      }
 
       // soy's stdlib violates ES5 strict
       if (!hasSoy) {
