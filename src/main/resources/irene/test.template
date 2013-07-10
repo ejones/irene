@@ -77,3 +77,5 @@ a {
 <div>
     <a>Hello, world!</a>
 </div>
+%%FILE %NAME%/empty.html
+

@@ -8,6 +8,7 @@ import java.util.logging.{Level, Logger}
 
 import com.google.common.io.Files
 import com.google.common.css
+import com.google.common.base.CharMatcher
 import com.google.gson.Gson
 import com.google.javascript.jscomp
 import com.google.javascript.jscomp.JSSourceFile
@@ -262,17 +263,17 @@ class ResourceCompiler (startTime: Long, charset: Charset,
       override def compile (fs: Iterable[File], tgt: File) = compiler (fs, tgt)
     }
 
-  /**
-   * Maps file extensions to functions that will take a file of that type, recurse  
-   * on its dependencies, and invoke an appropriate tool to concatenate and minify it
-   * all together. Outputs into an appropriately named file and returns the `File` instance.
-   */
-  lazy val fileExtToProcessor: Map[String, (File => (File, Long, Seq[ResourceError]))] = Map (
-    ".html" -> { file =>
+  def htmlProcessor (file: File): (File, Long, Seq[ResourceError]) = {
+      val docContent = Files toString (file, charset)
+
+      if (CharMatcher.WHITESPACE matchesAllOf docContent) {
+        return (new File ("/dev/null"), 0L, Array[ResourceError]())
+      }
+
       logVisit (file)
       visitedFiles += file
 
-      val doc = Jsoup parse (file, charset name)
+      val doc = Jsoup parse docContent
 
       def getCompilableNodes(selector: String, atname: String) =
         doc select selector filter { elem =>
@@ -462,8 +463,17 @@ setTimeout(function(){n.style.top=n.style.bottom=0;},0)""")
         target setLastModified startTime
       }
       (target, modified, errs)
-    },
+  }
     
+
+  /**
+   * Maps file extensions to functions that will take a file of that type, recurse  
+   * on its dependencies, and invoke an appropriate tool to concatenate and minify it
+   * all together. Outputs into an appropriately named file and returns the `File` instance.
+   */
+  lazy val fileExtToProcessor: Map[String, (File => (File, Long, Seq[ResourceError]))] = Map (
+    ".html" -> (htmlProcessor _),
+
     ".less" -> { file =>
       logVisit (file)
       visitedFiles += file
