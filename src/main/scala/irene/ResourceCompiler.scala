@@ -411,10 +411,20 @@ setTimeout(function(){n.style.top=n.style.bottom=0;},0)""")
         // update the observable $LAST_MODIFIED
         val stamp = doc createElement "script"
         stamp appendChild new DataNode ("$LAST_MODIFIED = new Date(" + startTime + ")", "")
-        (doc getElementsByTag "script" match {
-          case ts if ts.length > 0 => ts.first
-          case _ => doc.body.children.last
-        }) before stamp
+
+        {
+          val ts = doc getElementsByTag "script"
+          if (ts.length > 0) {
+            ts.first before stamp
+          } else {
+            val lst = doc.body.children.last
+            if (lst != null) {
+              lst before stamp
+            } else {
+              doc.body appendChild stamp
+            }
+          }
+        }
 
         // try to compress whitespace in output (we could remove it, but that could
         // create large lines which cause problems in proxies etc.)
