@@ -326,8 +326,19 @@ class ResourceCompiler (startTime: Long, charset: Charset,
         }
       }
 
-      val modified = deps.foldLeft(file lastModified) {
-                        (acc, next) => math.max (acc, next._6) }
+      // gather up other types of scripts (not JS) that may be in the doc for simple inlining
+      var otherScripts = 
+        doc select "script[type][type!=text/javascript][src]" map { scr =>
+          var f = file getSibling (scr attr "src")
+          visitedFiles += f
+          (scr, f)
+        }
+
+      val modified = (
+          (deps map (_._6)) ++
+          (otherScripts map (_._2.lastModified))
+        ). foldLeft (file lastModified) (math.max _)
+
       val target = defaultTarget (file)
 
       val errs = Array concat ((deps map (_._7.toArray)): _*)
@@ -426,6 +437,14 @@ setTimeout(function(){n.style.top=n.style.bottom=0;},0)""")
           } else {
             n replaceWith new TextNode ("\n", "")
           }
+        }
+
+        // insert the other script types
+        for ((scr, f) <- otherScripts) {
+          var inl = scr clone;
+          inl removeAttr "src"
+          inl appendChild new DataNode (Files toString (f, charset), "")
+          scr replaceWith inl
         }
 
         Files write (doc html, target, charset)

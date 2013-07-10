@@ -19,10 +19,11 @@
         <script>alert([aModule.num, bModule.num, cModule.num, $LAST_MODIFIED])</script>
         <script type="text/javascript">alert('hello!')</script>
 
-        <script type="text/html" src="%NAME%.html"></script>
         <script type="text/stuff">
             Hello
         </script>
+
+        <script type="text/html" src="partial.html"></script>
     </body>
 </html>
 %%FILE %NAME%/A.css
@@ -72,3 +73,7 @@ a {
         color: crimson;
     }
 }
+%%FILE %NAME%/partial.html
+<div>
+    <a>Hello, world!</a>
+</div>
