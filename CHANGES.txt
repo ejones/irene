@@ -1,3 +1,12 @@
+2013-07-10
+----------
+- fix exceptions caused by parsing empty HTML documents
+- improved handling of errors, esp. in .soy & .css files
+- Lighten some of the annoying and less helpful Closure warnings
+- Inline unknown script types with src attrs into HTML
+- Fix a null pointer error on empty HTML bodies
+- add directories to the watch to find new files
+
 2013-05-02
 ----------
 - now ignores non-JS HTML script tags
