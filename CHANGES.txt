@@ -1,3 +1,7 @@
+2013-07-19
+----------
+- make sure other script types trigger live updates
+
 2013-07-10
 ----------
 - fix exceptions caused by parsing empty HTML documents

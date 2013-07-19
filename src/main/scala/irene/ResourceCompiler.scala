@@ -410,6 +410,10 @@ setTimeout(function(){n.style.top=n.style.bottom=0;},0)""")
           }
         }
 
+        if (shouldUpdate && (otherScripts exists (_._2.lastModified > target.lastModified))) {
+          logUpdate (target, "window.location.reload();")
+        }
+
         // update the observable $LAST_MODIFIED
         val stamp = doc createElement "script"
         stamp appendChild new DataNode ("$LAST_MODIFIED = new Date(" + startTime + ")", "")
